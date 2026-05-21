@@ -1,30 +1,29 @@
 // =============================================================================
-//  COUCHE DE STOCKAGE PARTAGÉ
+//  COUCHE DE STOCKAGE PARTAGE
 // =============================================================================
-//  - Si Firebase est configuré (firebase.js rempli) : lecture/écriture dans
+//  - Si Firebase est configure (firebase.js rempli) : lecture/ecriture dans
 //    Firestore. Toute modification est alors visible par TOUS les appareils.
-//  - Sinon : repli automatique sur le stockage local du navigateur, pour que
-//    l'app fonctionne même sans configuration (chaque appareil garde ses réglages).
+//  - Sinon : repli automatique sur le stockage local du navigateur.
 //
-//  Les données partagées sont stockées dans un seul document Firestore :
-//    collection "renki" / document "config"
+//  Donnees stockees dans : collection "renki" / document "config"
 // =============================================================================
 
 import { db, firebaseReady } from './firebase';
 import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
 
-const DOC_REF = firebaseReady ? doc(db, 'renki', 'config') : null;
+const DOC_REF = firebaseReady && db ? doc(db, 'renki', 'config') : null;
 
 // --- Chargement initial -------------------------------------------------------
 export async function loadConfig() {
-  if (firebaseReady) {
+  if (DOC_REF) {
     try {
       const snap = await getDoc(DOC_REF);
       if (snap.exists()) return snap.data();
+      return {};
     } catch (e) {
       console.error('Firebase load error:', e);
+      return {};
     }
-    return {};
   }
   // Repli local
   const out = {};
@@ -37,9 +36,9 @@ export async function loadConfig() {
   return out;
 }
 
-// --- Sauvegarde d'une clé -----------------------------------------------------
+// --- Sauvegarde d'une cle -----------------------------------------------------
 export async function saveKey(key, value) {
-  if (firebaseReady) {
+  if (DOC_REF) {
     try {
       await setDoc(DOC_REF, { [key]: value }, { merge: true });
     } catch (e) {
@@ -52,10 +51,9 @@ export async function saveKey(key, value) {
   } catch (e) { /* ignore */ }
 }
 
-// --- Écoute en temps réel (Firebase uniquement) -------------------------------
-//  Permet de voir instantanément les changements faits par un autre appareil.
+// --- Ecoute temps reel (Firebase uniquement) ----------------------------------
 export function subscribeConfig(callback) {
-  if (!firebaseReady) return () => {};
+  if (!DOC_REF) return () => {};
   return onSnapshot(DOC_REF, (snap) => {
     if (snap.exists()) callback(snap.data());
   }, (e) => console.error('Firebase subscribe error:', e));
