@@ -1,9 +1,22 @@
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
-
-// https://vitejs.dev/config/
-export default defineConfig({
-  plugins: [react()],
-  // base: '/renki-cash/',  // ← Décommentez cette ligne UNIQUEMENT si vous publiez sur
-                            //    GitHub Pages dans un sous-dossier (ex: votrenom.github.io/renki-cash/)
-})
+{
+  "name": "renki-cash",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Renki Cash — application de reprise mobile en magasin (Coriolis Telecom), données partagées via Firebase",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "firebase": "^11.1.0",
+    "lucide-react": "^0.460.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.4",
+    "vite": "^5.4.11"
+  }
+}
