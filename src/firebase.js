@@ -18,12 +18,12 @@ import { initializeApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
 
 const firebaseConfig = {
-  apiKey: "AIzaSyBqQHKSIjQxaf11PeIJD3Ye62s5cQLSXi4",
-  authDomain: "renki-cash.firebaseapp.com",
-  projectId: "renki-cash",
-  storageBucket: "renki-cash.firebasestorage.app",
-  messagingSenderId: "765577601082",
-  appId: "1:765577601082:web:f56f086b7b06c5097d9503"
+  apiKey: "VOTRE_API_KEY",
+  authDomain: "VOTRE_PROJET.firebaseapp.com",
+  projectId: "VOTRE_PROJET",
+  storageBucket: "VOTRE_PROJET.appspot.com",
+  messagingSenderId: "VOTRE_SENDER_ID",
+  appId: "VOTRE_APP_ID",
 };
 
 const app = initializeApp(firebaseConfig);

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Search, Home, LayoutDashboard, Smartphone, Battery, Camera, FileText, ChevronRight, Plus, Edit2, Trash2, Save, X, Palette, Type, Settings, Check, ArrowLeft, Upload, Sparkles, Lock } from 'lucide-react';
+import { Search, Home, LayoutDashboard, Smartphone, Battery, Camera, FileText, ChevronRight, ChevronUp, ChevronDown, Plus, Edit2, Trash2, Save, X, Palette, Type, Settings, Check, ArrowLeft, Upload, Sparkles, Lock } from 'lucide-react';
 import { loadConfig, saveKey, subscribeConfig } from './storage';
 
 // Mot de passe d'accès au tableau de bord
@@ -1108,13 +1108,8 @@ function TypographyTab({ theme, setTheme }) {
 function ProductsTab({ theme, brands, products, setProducts }) {
   const [editing, setEditing] = useState(null);
   const [creating, setCreating] = useState(false);
-  const [filterBrand, setFilterBrand] = useState('all');
+  const [openBrand, setOpenBrand] = useState(brands[0]?.id || null);
   const [q, setQ] = useState('');
-
-  const filtered = products.filter(p =>
-    (filterBrand === 'all' || p.brand === filterBrand) &&
-    (q === '' || p.name.toLowerCase().includes(q.toLowerCase()))
-  );
 
   const handleSave = (prod) => {
     if (editing) setProducts(products.map(p => p.id === prod.id ? prod : p));
@@ -1125,46 +1120,100 @@ function ProductsTab({ theme, brands, products, setProducts }) {
     if (window.confirm('Supprimer définitivement ce produit ?')) setProducts(products.filter(p => p.id !== id));
   };
 
+  // Déplace un produit vers le haut/bas À L'INTÉRIEUR de sa marque.
+  // On réordonne le tableau global "products" en conséquence.
+  const moveWithinBrand = (productId, direction) => {
+    const product = products.find(p => p.id === productId);
+    if (!product) return;
+    // indices (dans le tableau global) des produits de la même marque, dans l'ordre
+    const sameBrandIndices = products
+      .map((p, i) => ({ p, i }))
+      .filter(x => x.p.brand === product.brand)
+      .map(x => x.i);
+    const posInBrand = sameBrandIndices.findIndex(i => products[i].id === productId);
+    const targetPos = posInBrand + direction;
+    if (targetPos < 0 || targetPos >= sameBrandIndices.length) return; // déjà en bout
+    const idxA = sameBrandIndices[posInBrand];
+    const idxB = sameBrandIndices[targetPos];
+    const next = [...products];
+    [next[idxA], next[idxB]] = [next[idxB], next[idxA]];
+    setProducts(next);
+  };
+
   if (editing || creating) {
     return <ProductEditor theme={theme} brands={brands} product={editing} onSave={handleSave} onCancel={() => { setEditing(null); setCreating(false); }} />;
   }
 
+  const query = q.trim().toLowerCase();
+
   return (
     <Card theme={theme} title={`Produits (${products.length})`}>
       <p style={{ fontSize: '0.85rem', color: theme.textMuted, margin: '0 0 14px' }}>
-        Gérez les modèles et leurs capacités de stockage. Le prix de rachat se calcule à partir du prix de vente concurrent saisi au moment de l'estimation.
+        Les modèles sont regroupés par marque. Utilisez les flèches pour les remonter ou les descendre dans l'ordre d'affichage du site.
       </p>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
-        <select value={filterBrand} onChange={(e) => setFilterBrand(e.target.value)} className="rc-input" style={{ ...inputStyle(theme), maxWidth: 200 }}>
-          <option value="all">Toutes marques</option>
-          {brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-        </select>
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Rechercher..." className="rc-input" style={{ ...inputStyle(theme), maxWidth: 240 }} />
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Rechercher un modèle..." className="rc-input" style={{ ...inputStyle(theme), maxWidth: 280 }} />
         <button className="rc-btn" onClick={() => setCreating(true)} style={{ padding: '9px 14px', borderRadius: 10, border: 'none', background: theme.primary, color: '#fff', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, marginLeft: 'auto' }}>
           <Plus size={16} /> Nouveau produit
         </button>
       </div>
 
-      <div style={{ display: 'grid', gap: 8, maxHeight: 600, overflowY: 'auto' }} className="rc-scroll">
-        {filtered.map(p => {
-          const brand = brands.find(b => b.id === p.brand);
+      <div style={{ display: 'grid', gap: 10 }}>
+        {brands.map(brand => {
+          const brandProducts = products.filter(p => p.brand === brand.id &&
+            (query === '' || p.name.toLowerCase().includes(query)));
+          const totalInBrand = products.filter(p => p.brand === brand.id).length;
+          if (query !== '' && brandProducts.length === 0) return null;
+          const isOpen = openBrand === brand.id || query !== '';
           return (
-            <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 12, borderRadius: 10, background: theme.surface, border: `1px solid ${theme.primary}10` }}>
-              <div style={{ width: 44, height: 44, borderRadius: 8, background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, overflow: 'hidden' }}>
-                {p.image ? <img src={p.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} /> : <span>{brand?.logo}</span>}
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontWeight: 700, fontSize: '0.92rem' }}>{p.name}</div>
-                <div style={{ fontSize: '0.78rem', color: theme.textMuted }}>
-                  {brand?.name} · {(p.storage || []).join(' / ')}
+            <div key={brand.id} style={{ borderRadius: 12, border: `1px solid ${theme.primary}15`, overflow: 'hidden' }}>
+              {/* En-tête de marque (cliquable pour ouvrir/fermer) */}
+              <button
+                onClick={() => setOpenBrand(isOpen && query === '' ? null : brand.id)}
+                className="rc-btn"
+                style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', border: 'none', background: theme.primaryLight, cursor: query !== '' ? 'default' : 'pointer', textAlign: 'left' }}
+              >
+                {brand.logoImage
+                  ? <img src={brand.logoImage} alt="" style={{ width: 24, height: 24, objectFit: 'contain' }} onError={(e) => { e.target.style.display = 'none'; }} />
+                  : <span style={{ fontSize: '1.3rem' }}>{brand.logo}</span>}
+                <span style={{ fontWeight: 800, fontSize: '1rem', fontFamily: 'Manrope, sans-serif', color: theme.text }}>{brand.name}</span>
+                <span style={{ fontSize: '0.78rem', color: theme.textMuted, fontWeight: 600 }}>{totalInBrand} modèle{totalInBrand > 1 ? 's' : ''}</span>
+                <ChevronRight size={18} style={{ marginLeft: 'auto', color: theme.textMuted, transform: isOpen ? 'rotate(90deg)' : 'none', transition: 'transform 0.2s' }} />
+              </button>
+
+              {/* Liste des modèles de la marque */}
+              {isOpen && (
+                <div style={{ display: 'grid', gap: 6, padding: 10 }}>
+                  {brandProducts.map((p, idx) => (
+                    <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: 10, borderRadius: 10, background: theme.surface, border: `1px solid ${theme.primary}10` }}>
+                      {/* Flèches de réordonnancement */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                        <button className="rc-btn" onClick={() => moveWithinBrand(p.id, -1)} disabled={idx === 0} title="Monter"
+                          style={{ width: 26, height: 22, borderRadius: 6, border: `1px solid ${theme.primary}20`, background: '#fff', cursor: idx === 0 ? 'default' : 'pointer', opacity: idx === 0 ? 0.3 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: theme.text, padding: 0 }}>
+                          <ChevronUp size={15} />
+                        </button>
+                        <button className="rc-btn" onClick={() => moveWithinBrand(p.id, 1)} disabled={idx === brandProducts.length - 1} title="Descendre"
+                          style={{ width: 26, height: 22, borderRadius: 6, border: `1px solid ${theme.primary}20`, background: '#fff', cursor: idx === brandProducts.length - 1 ? 'default' : 'pointer', opacity: idx === brandProducts.length - 1 ? 0.3 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: theme.text, padding: 0 }}>
+                          <ChevronDown size={15} />
+                        </button>
+                      </div>
+                      <div style={{ width: 40, height: 40, borderRadius: 8, background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, overflow: 'hidden' }}>
+                        {p.image ? <img src={p.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} /> : <span>{brand.logo}</span>}
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontWeight: 700, fontSize: '0.9rem' }}>{p.name}</div>
+                        <div style={{ fontSize: '0.76rem', color: theme.textMuted }}>{(p.storage || []).join(' / ')}</div>
+                      </div>
+                      <button className="rc-btn" onClick={() => setEditing(p)} style={iconBtn(theme)}><Edit2 size={15} /></button>
+                      <button className="rc-btn" onClick={() => handleDelete(p.id)} style={{ ...iconBtn(theme), color: '#dc2626' }}><Trash2 size={15} /></button>
+                    </div>
+                  ))}
+                  {brandProducts.length === 0 && <p style={{ color: theme.textMuted, fontSize: '0.85rem', textAlign: 'center', padding: 12 }}>Aucun modèle dans cette marque.</p>}
                 </div>
-              </div>
-              <button className="rc-btn" onClick={() => setEditing(p)} style={iconBtn(theme)}><Edit2 size={15} /></button>
-              <button className="rc-btn" onClick={() => handleDelete(p.id)} style={{ ...iconBtn(theme), color: '#dc2626' }}><Trash2 size={15} /></button>
+              )}
             </div>
           );
         })}
-        {filtered.length === 0 && <p style={{ color: theme.textMuted, textAlign: 'center', padding: 24 }}>Aucun produit.</p>}
       </div>
     </Card>
   );
