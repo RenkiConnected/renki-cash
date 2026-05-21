@@ -1,32 +1,22 @@
-rules_version = '2';
-
-// =============================================================================
-//  RÈGLES DE SÉCURITÉ FIRESTORE — Renki Cash
-// =============================================================================
-//  À copier-coller dans : Console Firebase > Firestore Database > onglet "Règles"
-//  puis cliquer "Publier".
-//
-//  Ces règles autorisent la lecture par tous (pour que le site fonctionne)
-//  et l'écriture par tous SUR LE SEUL document de config.
-//
-//  ⚠️  IMPORTANT : ces règles laissent l'écriture ouverte. La protection réelle
-//  vient du mot de passe du tableau de bord côté application. Pour une sécurité
-//  renforcée (recommandé à terme), activez l'authentification Firebase et
-//  remplacez "if true" par "if request.auth != null" sur l'écriture.
-// =============================================================================
-
-service cloud.firestore {
-  match /databases/{database}/documents {
-
-    // Document unique de configuration partagée
-    match /renki/config {
-      allow read: if true;
-      allow write: if true;
-    }
-
-    // Tout le reste est interdit
-    match /{document=**} {
-      allow read, write: if false;
-    }
+{
+  "name": "renki-cash",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Renki Cash — application de reprise mobile en magasin (Coriolis Telecom), données partagées via Firebase",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "firebase": "^11.1.0",
+    "lucide-react": "^0.460.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.4",
+    "vite": "^5.4.11"
   }
 }
