@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Search, Home, LayoutDashboard, Smartphone, Battery, Camera, FileText, ChevronRight, ChevronUp, ChevronDown, Plus, Edit2, Trash2, Save, X, Palette, Type, Settings, Check, ArrowLeft, Upload, Sparkles, Lock } from 'lucide-react';
-import { loadConfig, saveKey, subscribeConfig } from './storage';
+import { loadConfig, saveKey, subscribeConfig, firebaseReady } from './storage';
 
 // Mot de passe d'accès au tableau de bord
 const DASHBOARD_PASSWORD = 'Raphael2232';
@@ -151,6 +151,7 @@ const DEFAULT_THEME = {
   siteName: 'Renki Cash',
   logoUrl: '',
   fontSize: 16,
+  dashboardPassword: 'Raphael2232',  // modifiable dans le dashboard, onglet Réglages
 };
 
 // ================================================================
@@ -334,8 +335,10 @@ export default function RenkiCash() {
   return (
     <div className="rc-root">
       <style>{css}</style>
-      <Header theme={theme} view={view} setView={setView} goHome={goHome} searchQuery={searchQuery} setSearchQuery={setSearchQuery} />
+      {/* Bandeau d'info : tout en haut du site, défile avec la page */}
       <InfoBanner theme={theme} />
+      {/* Header */}
+      <Header theme={theme} view={view} setView={setView} goHome={goHome} searchQuery={searchQuery} setSearchQuery={setSearchQuery} />
       {view !== 'dashboard' && (
         <BrandsRibbon
           theme={theme}
@@ -364,7 +367,7 @@ function InfoBanner({ theme }) {
   const message = "Tout téléphone acheté il y a moins de 2 ans doit être repris avec sa facture d'achat";
   const items = Array.from({ length: 6 }, () => message);
   return (
-    <div style={{ background: theme.secondary, color: '#fff', overflow: 'hidden', position: 'sticky', top: 0, zIndex: 60, borderBottom: `2px solid ${theme.primary}` }}>
+    <div style={{ background: theme.secondary, color: '#fff', overflow: 'hidden', borderBottom: `2px solid ${theme.primary}` }}>
       <div style={{ display: 'flex', whiteSpace: 'nowrap', animation: 'rc-marquee 90s linear infinite', width: 'fit-content' }}>
         {[...items, ...items].map((msg, i) => (
           <div key={i} style={{ display: 'inline-flex', alignItems: 'center', gap: 10, padding: '8px 32px', fontSize: '0.85rem', fontWeight: 600 }}>
@@ -381,7 +384,7 @@ function InfoBanner({ theme }) {
 // ================== HEADER ==================
 function Header({ theme, view, setView, goHome, searchQuery, setSearchQuery }) {
   return (
-    <header style={{ background: '#fff', borderBottom: `1px solid ${theme.primary}15`, position: 'sticky', top: 35, zIndex: 50, boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+    <header style={{ background: '#fff', borderBottom: `1px solid ${theme.primary}15`, boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
       <div style={{ maxWidth: 1280, margin: '0 auto', padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 16 }}>
         <div onClick={goHome} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', flexShrink: 0 }}>
           {theme.logoUrl ? (
@@ -915,7 +918,8 @@ function DashboardLogin({ theme, onUnlock }) {
   const [error, setError] = useState(false);
 
   const tryUnlock = () => {
-    if (pwd === DASHBOARD_PASSWORD) { setError(false); onUnlock(); }
+    const expected = theme.dashboardPassword || DASHBOARD_PASSWORD;
+    if (pwd === expected) { setError(false); onUnlock(); }
     else { setError(true); }
   };
 
@@ -960,6 +964,7 @@ function Dashboard({ theme, setTheme, brands, setBrands, products, setProducts, 
     { id: 'products', label: 'Produits', icon: <Smartphone size={16} /> },
     { id: 'pricing', label: 'Formule de rachat', icon: <Settings size={16} /> },
     { id: 'brands', label: 'Marques', icon: <Sparkles size={16} /> },
+    { id: 'settings', label: 'Réglages', icon: <Lock size={16} /> },
   ];
 
   return (
@@ -967,7 +972,10 @@ function Dashboard({ theme, setTheme, brands, setBrands, products, setProducts, 
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 22 }}>
         <LayoutDashboard size={26} style={{ color: theme.primary }} />
         <h2 style={{ fontSize: '1.7rem', fontWeight: 800, margin: 0, fontFamily: 'Manrope, sans-serif', letterSpacing: '-0.02em' }}>Tableau de bord</h2>
-        <button className="rc-btn" onClick={onLock} style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 10, border: `1.5px solid ${theme.primary}25`, background: '#fff', color: theme.textMuted, fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer' }}>
+        <span style={{ marginLeft: 'auto', fontSize: '0.74rem', fontWeight: 700, padding: '5px 12px', borderRadius: 999, color: firebaseReady ? '#0f766e' : '#b45309', background: firebaseReady ? '#ccfbf1' : '#fef3c7' }}>
+          {firebaseReady ? '● Données partagées en ligne' : '● Mode local (Firebase non configuré)'}
+        </span>
+        <button className="rc-btn" onClick={onLock} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 10, border: `1.5px solid ${theme.primary}25`, background: '#fff', color: theme.textMuted, fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer' }}>
           <Lock size={15} /> Verrouiller
         </button>
       </div>
@@ -1000,7 +1008,52 @@ function Dashboard({ theme, setTheme, brands, setBrands, products, setProducts, 
         {tab === 'products' && <ProductsTab theme={theme} brands={brands} products={products} setProducts={setProducts} />}
         {tab === 'pricing' && <PricingTab theme={theme} pricing={pricing} setPricing={setPricing} />}
         {tab === 'brands' && <BrandsTab theme={theme} brands={brands} setBrands={setBrands} />}
+        {tab === 'settings' && <SettingsTab theme={theme} setTheme={setTheme} />}
       </div>
+    </div>
+  );
+}
+
+// --- Réglages (nom du site + mot de passe) ---
+function SettingsTab({ theme, setTheme }) {
+  const [newPwd, setNewPwd] = useState('');
+  const [confirmPwd, setConfirmPwd] = useState('');
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState('');
+
+  const savePassword = () => {
+    if (newPwd.length < 4) { setError('Le mot de passe doit faire au moins 4 caractères.'); return; }
+    if (newPwd !== confirmPwd) { setError('Les deux mots de passe ne correspondent pas.'); return; }
+    setTheme({ ...theme, dashboardPassword: newPwd });
+    setError(''); setSaved(true);
+    setNewPwd(''); setConfirmPwd('');
+    setTimeout(() => setSaved(false), 2500);
+  };
+
+  return (
+    <div style={{ display: 'grid', gap: 16 }}>
+      <Card theme={theme} title="Nom du site">
+        <Field label="Nom affiché dans l'en-tête et le pied de page">
+          <input className="rc-input" type="text" value={theme.siteName} onChange={(e) => setTheme({ ...theme, siteName: e.target.value })} style={inputStyle(theme)} />
+        </Field>
+      </Card>
+
+      <Card theme={theme} title="Mot de passe du tableau de bord">
+        <p style={{ fontSize: '0.85rem', color: theme.textMuted, margin: '0 0 14px' }}>
+          Ce mot de passe protège l'accès au tableau de bord. Choisissez-en un nouveau ci-dessous.
+        </p>
+        <Field label="Nouveau mot de passe">
+          <input className="rc-input" type="password" value={newPwd} onChange={(e) => { setNewPwd(e.target.value); setError(''); }} placeholder="Nouveau mot de passe" style={inputStyle(theme)} />
+        </Field>
+        <Field label="Confirmer le nouveau mot de passe">
+          <input className="rc-input" type="password" value={confirmPwd} onChange={(e) => { setConfirmPwd(e.target.value); setError(''); }} placeholder="Retapez le mot de passe" style={inputStyle(theme)} />
+        </Field>
+        {error && <p style={{ color: '#dc2626', fontSize: '0.85rem', margin: '0 0 12px', fontWeight: 600 }}>{error}</p>}
+        {saved && <p style={{ color: theme.success, fontSize: '0.85rem', margin: '0 0 12px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}><Check size={15} /> Mot de passe enregistré.</p>}
+        <button onClick={savePassword} className="rc-btn" style={{ padding: '10px 18px', borderRadius: 10, border: 'none', background: theme.primary, color: '#fff', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
+          <Save size={16} /> Modifier le mot de passe
+        </button>
+      </Card>
     </div>
   );
 }
