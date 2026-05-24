@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Search, Home, LayoutDashboard, Smartphone, Battery, Camera, FileText, ChevronRight, ChevronUp, ChevronDown, Plus, Edit2, Trash2, Save, X, Palette, Type, Settings, Check, ArrowLeft, Upload, Sparkles, Lock } from 'lucide-react';
+import { Search, Home, LayoutDashboard, Smartphone, Battery, Camera, FileText, ChevronRight, ChevronUp, ChevronDown, Plus, Edit2, Trash2, Save, X, Palette, Type, Settings, Check, ArrowLeft, Upload, Sparkles, Lock, ExternalLink } from 'lucide-react';
 import { loadConfig, saveKey, subscribeConfig, firebaseReady } from './storage';
 
 // Mot de passe d'accès au tableau de bord
@@ -933,6 +933,29 @@ function ProductView({ theme, product, brand, selectedStorage, setSelectedStorag
             <p style={{ fontSize: '0.8rem', color: theme.textMuted, margin: '0 0 10px' }}>
               Saisissez le prix affiché chez Back Market / Easy Cash / etc. Une décote de {discountPct}% est appliquée automatiquement comme base de calcul.
             </p>
+            {/* Boutons pour consulter le prix chez les concurrents (s'adaptent au modèle + capacité) */}
+            {(() => {
+              const q = encodeURIComponent(`${product.name}${selectedStorage ? ' ' + selectedStorage : ''}`);
+              const sites = [
+                { name: 'Back Market', color: '#1D2D5C', url: `https://www.backmarket.fr/fr-fr/search?q=${q}` },
+                { name: 'Easy Cash',   color: '#E2001A', url: `https://www.easycash.fr/recherche?q=${q}` },
+                { name: 'Recommerce',  color: '#00A88E', url: `https://fr.recommerce.com/recherche?q=${q}` },
+                { name: 'Google',      color: '#4285F4', url: `https://www.google.com/search?q=${q}+reconditionn%C3%A9+prix` },
+              ];
+              return (
+                <div style={{ marginBottom: 12 }}>
+                  <div style={{ fontSize: '0.78rem', color: theme.textMuted, fontWeight: 600, marginBottom: 6 }}>Consulter le prix en ligne (s'ouvre dans un nouvel onglet) :</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                    {sites.map(s => (
+                      <a key={s.name} href={s.url} target="_blank" rel="noopener noreferrer"
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 13px', borderRadius: 10, border: `1.5px solid ${s.color}30`, background: '#fff', color: s.color, fontWeight: 700, fontSize: '0.82rem', textDecoration: 'none' }}>
+                        <ExternalLink size={14} /> {s.name}
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
               <div style={{ position: 'relative', flex: '0 0 auto' }}>
                 <input
