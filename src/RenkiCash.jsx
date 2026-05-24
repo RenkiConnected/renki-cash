@@ -1566,12 +1566,26 @@ function ProductEditor({ theme, brands, product, onSave, onCancel }) {
     reader.readAsDataURL(file);
   };
 
-  const setCap = (idx, val) => {
-    const arr = [...form.storage]; arr[idx] = val;
-    setForm({ ...form, storage: arr });
+  // --- Sélecteur multiple de capacités ---
+  const [customCap, setCustomCap] = useState('');
+  // Capacités proposées par défaut (l'ordre sert au tri d'affichage)
+  const COMMON_CAPS = ['16 Go', '32 Go', '64 Go', '128 Go', '256 Go', '512 Go', '1 To', '2 To'];
+  const capOrder = (c) => { const i = COMMON_CAPS.indexOf(c); return i === -1 ? 999 : i; };
+  const toggleCap = (cap) => {
+    const has = form.storage.includes(cap);
+    const next = has ? form.storage.filter(c => c !== cap) : [...form.storage, cap];
+    next.sort((a, b) => capOrder(a) - capOrder(b));
+    setForm({ ...form, storage: next });
   };
-  const addCapacity = () => setForm({ ...form, storage: [...form.storage, 'Nouveau'] });
-  const removeCapacity = (idx) => setForm({ ...form, storage: form.storage.filter((_, i) => i !== idx) });
+  const addCustomCap = () => {
+    const v = customCap.trim();
+    if (!v || form.storage.includes(v)) { setCustomCap(''); return; }
+    const next = [...form.storage, v].sort((a, b) => capOrder(a) - capOrder(b));
+    setForm({ ...form, storage: next });
+    setCustomCap('');
+  };
+  // Valeurs proposées = communes + celles déjà présentes hors-liste (pour les recocher facilement)
+  const proposedCaps = [...new Set([...COMMON_CAPS, ...form.storage])].sort((a, b) => capOrder(a) - capOrder(b));
 
   return (
     <Card theme={theme} title={product ? `Modifier — ${product.name}` : 'Nouveau produit'}>
@@ -1596,15 +1610,52 @@ function ProductEditor({ theme, brands, product, onSave, onCancel }) {
         {form.image && <img src={form.image} alt="" style={{ marginTop: 8, maxHeight: 120, borderRadius: 8, background: theme.surface, padding: 8 }} onError={(e) => e.target.style.display = 'none'} />}
       </Field>
       <Field label="Capacités de stockage disponibles">
-        <div style={{ display: 'grid', gap: 8 }}>
-          {form.storage.map((cap, idx) => (
-            <div key={idx} style={{ display: 'flex', gap: 8 }}>
-              <input value={cap} onChange={(e) => setCap(idx, e.target.value)} className="rc-input" placeholder="128 Go" style={{ ...inputStyle(theme), flex: 1 }} />
-              <button onClick={() => removeCapacity(idx)} className="rc-btn" style={iconBtn(theme)} disabled={form.storage.length <= 1}><Trash2 size={15} /></button>
-            </div>
+        {/* Sélection actuelle (puces removables) */}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, padding: 12, borderRadius: 10, background: theme.primaryLight, border: `1.5px solid ${theme.primary}30`, minHeight: 44, alignItems: 'center', marginBottom: 12 }}>
+          {form.storage.length === 0 && (
+            <span style={{ fontSize: '0.85rem', color: theme.textMuted }}>Aucune capacité sélectionnée — choisissez-en ci-dessous.</span>
+          )}
+          {form.storage.map((cap) => (
+            <span key={cap} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 10px', borderRadius: 999, background: theme.primary, color: '#fff', fontWeight: 700, fontSize: '0.85rem' }}>
+              {cap}
+              <button onClick={() => toggleCap(cap)} title="Retirer" className="rc-btn" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 18, height: 18, borderRadius: '50%', border: 'none', background: 'rgba(255,255,255,0.25)', color: '#fff', cursor: 'pointer', padding: 0 }}>
+                <X size={12} />
+              </button>
+            </span>
           ))}
-          <button onClick={addCapacity} className="rc-btn" style={{ padding: '8px 12px', borderRadius: 10, border: `1.5px dashed ${theme.primary}40`, background: 'transparent', color: theme.primary, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'center' }}>
-            <Plus size={14} /> Ajouter une capacité
+        </div>
+
+        {/* Valeurs proposées (cliquables) */}
+        <div style={{ fontSize: '0.78rem', color: theme.textMuted, fontWeight: 600, marginBottom: 6 }}>Cliquez pour ajouter ou retirer :</div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
+          {proposedCaps.map((cap) => {
+            const selected = form.storage.includes(cap);
+            return (
+              <button key={cap} onClick={() => toggleCap(cap)} className="rc-btn" style={{
+                padding: '7px 13px', borderRadius: 999, cursor: 'pointer', fontSize: '0.85rem', fontWeight: 600,
+                border: `1.5px solid ${selected ? theme.primary : theme.primary + '25'}`,
+                background: selected ? theme.primary : '#fff',
+                color: selected ? '#fff' : theme.text,
+                display: 'flex', alignItems: 'center', gap: 5,
+              }}>
+                {selected && <Check size={13} />} {cap}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Ajouter une valeur personnalisée */}
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          <input
+            value={customCap}
+            onChange={(e) => setCustomCap(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addCustomCap(); } }}
+            placeholder="Autre capacité (ex : 768 Go)"
+            className="rc-input"
+            style={{ ...inputStyle(theme), maxWidth: 220 }}
+          />
+          <button onClick={addCustomCap} className="rc-btn" style={{ padding: '9px 14px', borderRadius: 10, border: `1.5px dashed ${theme.primary}40`, background: 'transparent', color: theme.primary, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <Plus size={14} /> Ajouter
           </button>
         </div>
       </Field>
