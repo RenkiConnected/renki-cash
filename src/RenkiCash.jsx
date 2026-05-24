@@ -52,8 +52,8 @@ const INITIAL_PRODUCTS = [
   { id: 'iphone-xr',         brand: 'apple', name: 'iPhone XR',         image: '', storage: mp({ '64 Go': 80, '128 Go': 100, '256 Go': 120 }) },
   { id: 'iphone-xs-max',     brand: 'apple', name: 'iPhone XS Max',     image: '', storage: mp({ '64 Go': 100, '256 Go': 130, '512 Go': 160 }) },
   { id: 'iphone-xs',         brand: 'apple', name: 'iPhone XS',         image: '', storage: mp({ '64 Go': 80, '256 Go': 100, '512 Go': 130 }) },
-  // ===== SAMSUNG (du plus recent au plus ancien, par gamme) =====
-  // -- Galaxy S --
+  // ========================= SAMSUNG =========================
+  // ----- Galaxy S -----
   { id: 's26-ultra', brand: 'samsung', name: 'Galaxy S26 Ultra', image: '', storage: mp({ '256 Go': 1, '512 Go': 1, '1 To': 1 }) },
   { id: 's26-plus',  brand: 'samsung', name: 'Galaxy S26+',      image: '', storage: mp({ '256 Go': 1, '512 Go': 1 }) },
   { id: 's26',       brand: 'samsung', name: 'Galaxy S26',       image: '', storage: mp({ '128 Go': 1, '256 Go': 1, '512 Go': 1 }) },
@@ -78,131 +78,248 @@ const INITIAL_PRODUCTS = [
   { id: 's21-fe',    brand: 'samsung', name: 'Galaxy S21 FE',    image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
   { id: 's21',       brand: 'samsung', name: 'Galaxy S21',       image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
   { id: 's20-ultra', brand: 'samsung', name: 'Galaxy S20 Ultra', image: '', storage: mp({ '128 Go': 1, '512 Go': 1 }) },
-  { id: 's20-plus',  brand: 'samsung', name: 'Galaxy S20+',      image: '', storage: mp({ '128 Go': 1 }) },
+  { id: 's20-plus',  brand: 'samsung', name: 'Galaxy S20+',      image: '', storage: mp({ '128 Go': 1, '512 Go': 1 }) },
   { id: 's20-fe',    brand: 'samsung', name: 'Galaxy S20 FE',    image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
   { id: 's20',       brand: 'samsung', name: 'Galaxy S20',       image: '', storage: mp({ '128 Go': 1 }) },
-  // -- Galaxy Z Fold --
+  // ----- Galaxy Z Fold -----
   { id: 'z-fold-7',  brand: 'samsung', name: 'Galaxy Z Fold 7',  image: '', storage: mp({ '256 Go': 1, '512 Go': 1, '1 To': 1 }) },
   { id: 'z-fold-6',  brand: 'samsung', name: 'Galaxy Z Fold 6',  image: '', storage: mp({ '256 Go': 1, '512 Go': 1, '1 To': 1 }) },
   { id: 'z-fold-5',  brand: 'samsung', name: 'Galaxy Z Fold 5',  image: '', storage: mp({ '256 Go': 1, '512 Go': 1, '1 To': 1 }) },
   { id: 'z-fold-4',  brand: 'samsung', name: 'Galaxy Z Fold 4',  image: '', storage: mp({ '256 Go': 1, '512 Go': 1, '1 To': 1 }) },
   { id: 'z-fold-3',  brand: 'samsung', name: 'Galaxy Z Fold 3',  image: '', storage: mp({ '256 Go': 1, '512 Go': 1 }) },
-  // -- Galaxy Z Flip --
+  // ----- Galaxy Z Flip -----
   { id: 'z-flip-7',  brand: 'samsung', name: 'Galaxy Z Flip 7',  image: '', storage: mp({ '256 Go': 1, '512 Go': 1 }) },
   { id: 'z-flip-6',  brand: 'samsung', name: 'Galaxy Z Flip 6',  image: '', storage: mp({ '256 Go': 1, '512 Go': 1 }) },
   { id: 'z-flip-5',  brand: 'samsung', name: 'Galaxy Z Flip 5',  image: '', storage: mp({ '256 Go': 1, '512 Go': 1 }) },
   { id: 'z-flip-4',  brand: 'samsung', name: 'Galaxy Z Flip 4',  image: '', storage: mp({ '128 Go': 1, '256 Go': 1, '512 Go': 1 }) },
   { id: 'z-flip-3',  brand: 'samsung', name: 'Galaxy Z Flip 3',  image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
-  // -- Galaxy A --
-  { id: 'a57',       brand: 'samsung', name: 'Galaxy A57 5G',    image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
-  { id: 'a56',       brand: 'samsung', name: 'Galaxy A56 5G',    image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
-  { id: 'a55',       brand: 'samsung', name: 'Galaxy A55 5G',    image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
-  { id: 'a54',       brand: 'samsung', name: 'Galaxy A54 5G',    image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
-  { id: 'a53',       brand: 'samsung', name: 'Galaxy A53 5G',    image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
-  { id: 'a37',       brand: 'samsung', name: 'Galaxy A37 5G',    image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
-  { id: 'a36',       brand: 'samsung', name: 'Galaxy A36 5G',    image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
-  { id: 'a35',       brand: 'samsung', name: 'Galaxy A35 5G',    image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
-  { id: 'a34',       brand: 'samsung', name: 'Galaxy A34 5G',    image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
-  { id: 'a27',       brand: 'samsung', name: 'Galaxy A27 5G',    image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
-  { id: 'a26',       brand: 'samsung', name: 'Galaxy A26 5G',    image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
-  { id: 'a25',       brand: 'samsung', name: 'Galaxy A25 5G',    image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
-  { id: 'a17',       brand: 'samsung', name: 'Galaxy A17',       image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
-  { id: 'a16',       brand: 'samsung', name: 'Galaxy A16 5G',    image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
-  { id: 'a15',       brand: 'samsung', name: 'Galaxy A15',       image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
-  { id: 'a14',       brand: 'samsung', name: 'Galaxy A14',       image: '', storage: mp({ '64 Go': 1, '128 Go': 1 }) },
-  { id: 'a07',       brand: 'samsung', name: 'Galaxy A07',       image: '', storage: mp({ '64 Go': 1, '128 Go': 1 }) },
-  { id: 'a06',       brand: 'samsung', name: 'Galaxy A06',       image: '', storage: mp({ '64 Go': 1, '128 Go': 1 }) },
-  // ===== XIAOMI (du plus recent au plus ancien, par gamme) =====
-  // -- Xiaomi (flagship) --
-  { id: 'xiaomi-15-ultra', brand: 'xiaomi', name: 'Xiaomi 15 Ultra',  image: '', storage: mp({ '512 Go': 1, '1 To': 1 }) },
-  { id: 'xiaomi-15-pro',   brand: 'xiaomi', name: 'Xiaomi 15 Pro',    image: '', storage: mp({ '256 Go': 1, '512 Go': 1, '1 To': 1 }) },
-  { id: 'xiaomi-15',       brand: 'xiaomi', name: 'Xiaomi 15',        image: '', storage: mp({ '256 Go': 1, '512 Go': 1 }) },
-  { id: 'xiaomi-15t-pro',  brand: 'xiaomi', name: 'Xiaomi 15T Pro',   image: '', storage: mp({ '256 Go': 1, '512 Go': 1, '1 To': 1 }) },
-  { id: 'xiaomi-15t',      brand: 'xiaomi', name: 'Xiaomi 15T',       image: '', storage: mp({ '256 Go': 1, '512 Go': 1 }) },
-  { id: 'xiaomi-14-ultra', brand: 'xiaomi', name: 'Xiaomi 14 Ultra',  image: '', storage: mp({ '512 Go': 1, '1 To': 1 }) },
-  { id: 'xiaomi-14-pro',   brand: 'xiaomi', name: 'Xiaomi 14 Pro',    image: '', storage: mp({ '256 Go': 1, '512 Go': 1 }) },
-  { id: 'xiaomi-14',       brand: 'xiaomi', name: 'Xiaomi 14',        image: '', storage: mp({ '256 Go': 1, '512 Go': 1 }) },
-  { id: 'xiaomi-14t-pro',  brand: 'xiaomi', name: 'Xiaomi 14T Pro',   image: '', storage: mp({ '512 Go': 1, '1 To': 1 }) },
-  { id: 'xiaomi-14t',      brand: 'xiaomi', name: 'Xiaomi 14T',       image: '', storage: mp({ '256 Go': 1, '512 Go': 1 }) },
-  { id: 'xiaomi-13-ultra', brand: 'xiaomi', name: 'Xiaomi 13 Ultra',  image: '', storage: mp({ '256 Go': 1, '512 Go': 1, '1 To': 1 }) },
-  { id: 'xiaomi-13-pro',   brand: 'xiaomi', name: 'Xiaomi 13 Pro',    image: '', storage: mp({ '256 Go': 1, '512 Go': 1 }) },
-  { id: 'xiaomi-13',       brand: 'xiaomi', name: 'Xiaomi 13',        image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
-  { id: 'xiaomi-13t-pro',  brand: 'xiaomi', name: 'Xiaomi 13T Pro',   image: '', storage: mp({ '256 Go': 1, '512 Go': 1, '1 To': 1 }) },
-  { id: 'xiaomi-13t',      brand: 'xiaomi', name: 'Xiaomi 13T',       image: '', storage: mp({ '256 Go': 1 }) },
-  { id: 'xiaomi-13-lite',  brand: 'xiaomi', name: 'Xiaomi 13 Lite',   image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
-  { id: 'xiaomi-12-pro',   brand: 'xiaomi', name: 'Xiaomi 12 Pro',    image: '', storage: mp({ '256 Go': 1 }) },
-  { id: 'xiaomi-12t-pro',  brand: 'xiaomi', name: 'Xiaomi 12T Pro',   image: '', storage: mp({ '256 Go': 1 }) },
-  { id: 'xiaomi-12',       brand: 'xiaomi', name: 'Xiaomi 12',        image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
-  { id: 'xiaomi-mix-flip', brand: 'xiaomi', name: 'Xiaomi MIX Flip',  image: '', storage: mp({ '256 Go': 1, '512 Go': 1 }) },
-  // -- Redmi Note --
-  { id: 'redmi-note-15-pro-plus', brand: 'xiaomi', name: 'Redmi Note 15 Pro+', image: '', storage: mp({ '256 Go': 1, '512 Go': 1 }) },
-  { id: 'redmi-note-15-pro',      brand: 'xiaomi', name: 'Redmi Note 15 Pro',  image: '', storage: mp({ '256 Go': 1, '512 Go': 1 }) },
-  { id: 'redmi-note-15',          brand: 'xiaomi', name: 'Redmi Note 15',      image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
-  { id: 'redmi-note-14-pro-plus', brand: 'xiaomi', name: 'Redmi Note 14 Pro+', image: '', storage: mp({ '256 Go': 1, '512 Go': 1 }) },
-  { id: 'redmi-note-14-pro',      brand: 'xiaomi', name: 'Redmi Note 14 Pro',  image: '', storage: mp({ '128 Go': 1, '256 Go': 1, '512 Go': 1 }) },
-  { id: 'redmi-note-14',          brand: 'xiaomi', name: 'Redmi Note 14',      image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
-  { id: 'redmi-note-13-pro-plus', brand: 'xiaomi', name: 'Redmi Note 13 Pro+', image: '', storage: mp({ '256 Go': 1, '512 Go': 1 }) },
-  { id: 'redmi-note-13-pro',      brand: 'xiaomi', name: 'Redmi Note 13 Pro',  image: '', storage: mp({ '128 Go': 1, '256 Go': 1, '512 Go': 1 }) },
-  { id: 'redmi-note-13',          brand: 'xiaomi', name: 'Redmi Note 13',      image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
-  { id: 'redmi-note-12-pro-plus', brand: 'xiaomi', name: 'Redmi Note 12 Pro+', image: '', storage: mp({ '256 Go': 1 }) },
-  { id: 'redmi-note-12-pro',      brand: 'xiaomi', name: 'Redmi Note 12 Pro',  image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
-  { id: 'redmi-note-12',          brand: 'xiaomi', name: 'Redmi Note 12',      image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
-  // -- Redmi --
-  { id: 'redmi-15',               brand: 'xiaomi', name: 'Redmi 15',          image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
-  { id: 'redmi-15c',              brand: 'xiaomi', name: 'Redmi 15C',         image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
-  { id: 'redmi-14c',              brand: 'xiaomi', name: 'Redmi 14C',         image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
-  { id: 'redmi-13',               brand: 'xiaomi', name: 'Redmi 13',          image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
-  { id: 'redmi-13c',              brand: 'xiaomi', name: 'Redmi 13C',         image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
-  // -- Poco --
-  { id: 'poco-f8-ultra',          brand: 'xiaomi', name: 'Poco F8 Ultra',     image: '', storage: mp({ '256 Go': 1, '512 Go': 1, '1 To': 1 }) },
-  { id: 'poco-f8-pro',            brand: 'xiaomi', name: 'Poco F8 Pro',       image: '', storage: mp({ '256 Go': 1, '512 Go': 1 }) },
-  { id: 'poco-f7-ultra',          brand: 'xiaomi', name: 'Poco F7 Ultra',     image: '', storage: mp({ '256 Go': 1, '512 Go': 1 }) },
-  { id: 'poco-f7-pro',            brand: 'xiaomi', name: 'Poco F7 Pro',       image: '', storage: mp({ '256 Go': 1, '512 Go': 1 }) },
-  { id: 'poco-f7',                brand: 'xiaomi', name: 'Poco F7',           image: '', storage: mp({ '256 Go': 1, '512 Go': 1 }) },
-  { id: 'poco-f6-pro',            brand: 'xiaomi', name: 'Poco F6 Pro',       image: '', storage: mp({ '256 Go': 1, '512 Go': 1, '1 To': 1 }) },
-  { id: 'poco-f6',                brand: 'xiaomi', name: 'Poco F6',           image: '', storage: mp({ '256 Go': 1, '512 Go': 1 }) },
-  { id: 'poco-x7-pro',            brand: 'xiaomi', name: 'Poco X7 Pro',       image: '', storage: mp({ '256 Go': 1, '512 Go': 1 }) },
-  { id: 'poco-x7',                brand: 'xiaomi', name: 'Poco X7',           image: '', storage: mp({ '256 Go': 1, '512 Go': 1 }) },
-  { id: 'poco-x6-pro',            brand: 'xiaomi', name: 'Poco X6 Pro',       image: '', storage: mp({ '256 Go': 1, '512 Go': 1 }) },
-  { id: 'poco-x6',                brand: 'xiaomi', name: 'Poco X6',           image: '', storage: mp({ '256 Go': 1, '512 Go': 1 }) },
-  { id: 'poco-m7-pro',            brand: 'xiaomi', name: 'Poco M7 Pro',       image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
-  { id: 'poco-m6-pro',            brand: 'xiaomi', name: 'Poco M6 Pro',       image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
-  // ===== HONOR (du plus recent au plus ancien, par gamme) =====
-  // -- Magic --
-  { id: 'honor-magic-7-pro', brand: 'honor', name: 'Honor Magic 7 Pro', image: '', storage: mp({ '512 Go': 1, '1 To': 1 }) },
+  // ----- Galaxy A -----
+  { id: 'a57',  brand: 'samsung', name: 'Galaxy A57 5G', image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
+  { id: 'a56',  brand: 'samsung', name: 'Galaxy A56 5G', image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
+  { id: 'a55',  brand: 'samsung', name: 'Galaxy A55 5G', image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
+  { id: 'a54',  brand: 'samsung', name: 'Galaxy A54 5G', image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
+  { id: 'a53',  brand: 'samsung', name: 'Galaxy A53 5G', image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
+  { id: 'a52s', brand: 'samsung', name: 'Galaxy A52s 5G', image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
+  { id: 'a52',  brand: 'samsung', name: 'Galaxy A52', image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
+  { id: 'a51',  brand: 'samsung', name: 'Galaxy A51', image: '', storage: mp({ '64 Go': 1, '128 Go': 1 }) },
+  { id: 'a42',  brand: 'samsung', name: 'Galaxy A42 5G', image: '', storage: mp({ '128 Go': 1 }) },
+  { id: 'a41',  brand: 'samsung', name: 'Galaxy A41', image: '', storage: mp({ '64 Go': 1 }) },
+  { id: 'a37',  brand: 'samsung', name: 'Galaxy A37 5G', image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
+  { id: 'a36',  brand: 'samsung', name: 'Galaxy A36 5G', image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
+  { id: 'a35',  brand: 'samsung', name: 'Galaxy A35 5G', image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
+  { id: 'a34',  brand: 'samsung', name: 'Galaxy A34 5G', image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
+  { id: 'a33',  brand: 'samsung', name: 'Galaxy A33 5G', image: '', storage: mp({ '128 Go': 1 }) },
+  { id: 'a32',  brand: 'samsung', name: 'Galaxy A32', image: '', storage: mp({ '64 Go': 1, '128 Go': 1 }) },
+  { id: 'a27',  brand: 'samsung', name: 'Galaxy A27 5G', image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
+  { id: 'a26',  brand: 'samsung', name: 'Galaxy A26 5G', image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
+  { id: 'a25',  brand: 'samsung', name: 'Galaxy A25 5G', image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
+  { id: 'a24',  brand: 'samsung', name: 'Galaxy A24', image: '', storage: mp({ '128 Go': 1 }) },
+  { id: 'a23',  brand: 'samsung', name: 'Galaxy A23 5G', image: '', storage: mp({ '64 Go': 1, '128 Go': 1 }) },
+  { id: 'a17',  brand: 'samsung', name: 'Galaxy A17', image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
+  { id: 'a16',  brand: 'samsung', name: 'Galaxy A16 5G', image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
+  { id: 'a15',  brand: 'samsung', name: 'Galaxy A15', image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
+  { id: 'a14',  brand: 'samsung', name: 'Galaxy A14', image: '', storage: mp({ '64 Go': 1, '128 Go': 1 }) },
+  { id: 'a13',  brand: 'samsung', name: 'Galaxy A13', image: '', storage: mp({ '32 Go': 1, '64 Go': 1, '128 Go': 1 }) },
+  { id: 'a07',  brand: 'samsung', name: 'Galaxy A07', image: '', storage: mp({ '64 Go': 1, '128 Go': 1 }) },
+  { id: 'a06',  brand: 'samsung', name: 'Galaxy A06', image: '', storage: mp({ '64 Go': 1, '128 Go': 1 }) },
+  { id: 'a05s', brand: 'samsung', name: 'Galaxy A05s', image: '', storage: mp({ '64 Go': 1, '128 Go': 1 }) },
+  { id: 'a05',  brand: 'samsung', name: 'Galaxy A05', image: '', storage: mp({ '64 Go': 1, '128 Go': 1 }) },
+  { id: 'a04s', brand: 'samsung', name: 'Galaxy A04s', image: '', storage: mp({ '32 Go': 1, '64 Go': 1 }) },
+  { id: 'a04',  brand: 'samsung', name: 'Galaxy A04', image: '', storage: mp({ '32 Go': 1, '64 Go': 1 }) },
+  { id: 'a03s', brand: 'samsung', name: 'Galaxy A03s', image: '', storage: mp({ '32 Go': 1, '64 Go': 1 }) },
+  { id: 'a03',  brand: 'samsung', name: 'Galaxy A03', image: '', storage: mp({ '32 Go': 1, '64 Go': 1 }) },
+  { id: 'a02s', brand: 'samsung', name: 'Galaxy A02s', image: '', storage: mp({ '32 Go': 1, '64 Go': 1 }) },
+  // ========================= XIAOMI =========================
+  // ----- Xiaomi (serie phare) -----
+  { id: 'xiaomi-15t-pro',  brand: 'xiaomi', name: 'Xiaomi 15T Pro',  image: '', storage: mp({ '256 Go': 1, '512 Go': 1, '1 To': 1 }) },
+  { id: 'xiaomi-15t',      brand: 'xiaomi', name: 'Xiaomi 15T',      image: '', storage: mp({ '256 Go': 1, '512 Go': 1 }) },
+  { id: 'xiaomi-15-ultra', brand: 'xiaomi', name: 'Xiaomi 15 Ultra', image: '', storage: mp({ '512 Go': 1, '1 To': 1 }) },
+  { id: 'xiaomi-15-pro',   brand: 'xiaomi', name: 'Xiaomi 15 Pro',   image: '', storage: mp({ '256 Go': 1, '512 Go': 1, '1 To': 1 }) },
+  { id: 'xiaomi-15',       brand: 'xiaomi', name: 'Xiaomi 15',       image: '', storage: mp({ '256 Go': 1, '512 Go': 1 }) },
+  { id: 'xiaomi-14t-pro',  brand: 'xiaomi', name: 'Xiaomi 14T Pro',  image: '', storage: mp({ '512 Go': 1, '1 To': 1 }) },
+  { id: 'xiaomi-14t',      brand: 'xiaomi', name: 'Xiaomi 14T',      image: '', storage: mp({ '256 Go': 1, '512 Go': 1 }) },
+  { id: 'xiaomi-14-ultra', brand: 'xiaomi', name: 'Xiaomi 14 Ultra', image: '', storage: mp({ '512 Go': 1, '1 To': 1 }) },
+  { id: 'xiaomi-14',       brand: 'xiaomi', name: 'Xiaomi 14',       image: '', storage: mp({ '256 Go': 1, '512 Go': 1 }) },
+  { id: 'xiaomi-13t-pro',  brand: 'xiaomi', name: 'Xiaomi 13T Pro',  image: '', storage: mp({ '256 Go': 1, '512 Go': 1, '1 To': 1 }) },
+  { id: 'xiaomi-13t',      brand: 'xiaomi', name: 'Xiaomi 13T',      image: '', storage: mp({ '256 Go': 1 }) },
+  { id: 'xiaomi-13-ultra', brand: 'xiaomi', name: 'Xiaomi 13 Ultra', image: '', storage: mp({ '256 Go': 1, '512 Go': 1, '1 To': 1 }) },
+  { id: 'xiaomi-13-pro',   brand: 'xiaomi', name: 'Xiaomi 13 Pro',   image: '', storage: mp({ '256 Go': 1, '512 Go': 1 }) },
+  { id: 'xiaomi-13-lite',  brand: 'xiaomi', name: 'Xiaomi 13 Lite',  image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
+  { id: 'xiaomi-13',       brand: 'xiaomi', name: 'Xiaomi 13',       image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
+  { id: 'xiaomi-12x',      brand: 'xiaomi', name: 'Xiaomi 12X',      image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
+  { id: 'xiaomi-12-pro',   brand: 'xiaomi', name: 'Xiaomi 12 Pro',   image: '', storage: mp({ '256 Go': 1 }) },
+  { id: 'xiaomi-12-lite',  brand: 'xiaomi', name: 'Xiaomi 12 Lite',  image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
+  { id: 'xiaomi-12t-pro',  brand: 'xiaomi', name: 'Xiaomi 12T Pro',  image: '', storage: mp({ '256 Go': 1 }) },
+  { id: 'xiaomi-12t',      brand: 'xiaomi', name: 'Xiaomi 12T',      image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
+  { id: 'xiaomi-12',       brand: 'xiaomi', name: 'Xiaomi 12',       image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
+  { id: 'xiaomi-11t-pro',  brand: 'xiaomi', name: 'Xiaomi 11T Pro',  image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
+  { id: 'xiaomi-11t',      brand: 'xiaomi', name: 'Xiaomi 11T',      image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
+  { id: 'xiaomi-11-lite-5g-ne', brand: 'xiaomi', name: 'Xiaomi 11 Lite 5G NE', image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
+  // ----- Mi -----
+  { id: 'mi-11-ultra',     brand: 'xiaomi', name: 'Mi 11 Ultra',     image: '', storage: mp({ '256 Go': 1, '512 Go': 1 }) },
+  { id: 'mi-11-pro',       brand: 'xiaomi', name: 'Mi 11 Pro',       image: '', storage: mp({ '256 Go': 1 }) },
+  { id: 'mi-11i',          brand: 'xiaomi', name: 'Mi 11i',          image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
+  { id: 'mi-11-5g',        brand: 'xiaomi', name: 'Mi 11 5G',        image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
+  { id: 'mi-11-lite-5g',   brand: 'xiaomi', name: 'Mi 11 Lite 5G',   image: '', storage: mp({ '128 Go': 1 }) },
+  { id: 'mi-11-lite-4g',   brand: 'xiaomi', name: 'Mi 11 Lite 4G',   image: '', storage: mp({ '128 Go': 1 }) },
+  { id: 'mi-10t-pro-5g',   brand: 'xiaomi', name: 'Mi 10T Pro 5G',   image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
+  { id: 'mi-10t-5g',       brand: 'xiaomi', name: 'Mi 10T 5G',       image: '', storage: mp({ '128 Go': 1 }) },
+  { id: 'mi-10t-lite-5g',  brand: 'xiaomi', name: 'Mi 10T Lite 5G',  image: '', storage: mp({ '64 Go': 1, '128 Go': 1 }) },
+  { id: 'mi-10-pro-5g',    brand: 'xiaomi', name: 'Mi 10 Pro 5G',    image: '', storage: mp({ '256 Go': 1 }) },
+  { id: 'mi-10-5g',        brand: 'xiaomi', name: 'Mi 10 5G',        image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
+  { id: 'mi-10-lite-5g',   brand: 'xiaomi', name: 'Mi 10 Lite 5G',   image: '', storage: mp({ '64 Go': 1, '128 Go': 1 }) },
+  { id: 'mi-9t-pro',       brand: 'xiaomi', name: 'Mi 9T Pro',       image: '', storage: mp({ '64 Go': 1, '128 Go': 1 }) },
+  { id: 'mi-9t',           brand: 'xiaomi', name: 'Mi 9T',           image: '', storage: mp({ '64 Go': 1, '128 Go': 1 }) },
+  { id: 'mi-9-se',         brand: 'xiaomi', name: 'Mi 9 SE',         image: '', storage: mp({ '64 Go': 1, '128 Go': 1 }) },
+  { id: 'mi-9',            brand: 'xiaomi', name: 'Mi 9',            image: '', storage: mp({ '64 Go': 1, '128 Go': 1 }) },
+  { id: 'mi-9-lite',       brand: 'xiaomi', name: 'Mi 9 Lite',       image: '', storage: mp({ '64 Go': 1, '128 Go': 1 }) },
+  { id: 'mi-8',            brand: 'xiaomi', name: 'Mi 8',            image: '', storage: mp({ '64 Go': 1, '128 Go': 1 }) },
+  { id: 'mi-8-lite',       brand: 'xiaomi', name: 'Mi 8 Lite',       image: '', storage: mp({ '64 Go': 1, '128 Go': 1 }) },
+  { id: 'mi-note-10-pro',  brand: 'xiaomi', name: 'Mi Note 10 Pro',  image: '', storage: mp({ '256 Go': 1 }) },
+  { id: 'mi-note-10',      brand: 'xiaomi', name: 'Mi Note 10',      image: '', storage: mp({ '128 Go': 1 }) },
+  { id: 'mi-note-10-lite', brand: 'xiaomi', name: 'Mi Note 10 Lite', image: '', storage: mp({ '64 Go': 1, '128 Go': 1 }) },
+  { id: 'mi-mix-3',        brand: 'xiaomi', name: 'Mi Mix 3',        image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
+  { id: 'mi-mix-2s',       brand: 'xiaomi', name: 'Mi Mix 2S',       image: '', storage: mp({ '64 Go': 1, '128 Go': 1 }) },
+  { id: 'mi-mix-2',        brand: 'xiaomi', name: 'Mi Mix 2',        image: '', storage: mp({ '64 Go': 1, '128 Go': 1 }) },
+  { id: 'mi-a3',           brand: 'xiaomi', name: 'Mi A3',           image: '', storage: mp({ '64 Go': 1, '128 Go': 1 }) },
+  { id: 'mi-a2-lite',      brand: 'xiaomi', name: 'Mi A2 Lite',      image: '', storage: mp({ '32 Go': 1, '64 Go': 1 }) },
+  { id: 'mi-a2',           brand: 'xiaomi', name: 'Mi A2',           image: '', storage: mp({ '32 Go': 1, '64 Go': 1, '128 Go': 1 }) },
+  // ----- Redmi Note -----
+  { id: 'redmi-note-15-pro-plus-5g', brand: 'xiaomi', name: 'Redmi Note 15 Pro+ 5G', image: '', storage: mp({ '256 Go': 1, '512 Go': 1 }) },
+  { id: 'redmi-note-15-pro-5g',      brand: 'xiaomi', name: 'Redmi Note 15 Pro 5G',  image: '', storage: mp({ '256 Go': 1, '512 Go': 1 }) },
+  { id: 'redmi-note-15-pro-4g',      brand: 'xiaomi', name: 'Redmi Note 15 Pro 4G',  image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
+  { id: 'redmi-note-15-5g',          brand: 'xiaomi', name: 'Redmi Note 15 5G',      image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
+  { id: 'redmi-note-15-4g',          brand: 'xiaomi', name: 'Redmi Note 15 4G',      image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
+  { id: 'redmi-note-14-pro-plus-5g', brand: 'xiaomi', name: 'Redmi Note 14 Pro+ 5G', image: '', storage: mp({ '256 Go': 1, '512 Go': 1 }) },
+  { id: 'redmi-note-14-pro-5g',      brand: 'xiaomi', name: 'Redmi Note 14 Pro 5G',  image: '', storage: mp({ '256 Go': 1, '512 Go': 1 }) },
+  { id: 'redmi-note-14-pro-4g',      brand: 'xiaomi', name: 'Redmi Note 14 Pro 4G',  image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
+  { id: 'redmi-note-14-5g',          brand: 'xiaomi', name: 'Redmi Note 14 5G',      image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
+  { id: 'redmi-note-14-4g',          brand: 'xiaomi', name: 'Redmi Note 14 4G',      image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
+  { id: 'redmi-note-13-pro-plus-5g', brand: 'xiaomi', name: 'Redmi Note 13 Pro+ 5G', image: '', storage: mp({ '256 Go': 1, '512 Go': 1 }) },
+  { id: 'redmi-note-13-pro-5g',      brand: 'xiaomi', name: 'Redmi Note 13 Pro 5G',  image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
+  { id: 'redmi-note-13-pro-4g',      brand: 'xiaomi', name: 'Redmi Note 13 Pro 4G',  image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
+  { id: 'redmi-note-13-5g',          brand: 'xiaomi', name: 'Redmi Note 13 5G',      image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
+  { id: 'redmi-note-13-4g',          brand: 'xiaomi', name: 'Redmi Note 13 4G',      image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
+  { id: 'redmi-note-12-pro-plus-5g', brand: 'xiaomi', name: 'Redmi Note 12 Pro+ 5G', image: '', storage: mp({ '256 Go': 1 }) },
+  { id: 'redmi-note-12-pro-5g',      brand: 'xiaomi', name: 'Redmi Note 12 Pro 5G',  image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
+  { id: 'redmi-note-12-pro-4g',      brand: 'xiaomi', name: 'Redmi Note 12 Pro 4G',  image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
+  { id: 'redmi-note-12s',            brand: 'xiaomi', name: 'Redmi Note 12S',        image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
+  { id: 'redmi-note-12-5g',          brand: 'xiaomi', name: 'Redmi Note 12 5G',      image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
+  { id: 'redmi-note-12-4g',          brand: 'xiaomi', name: 'Redmi Note 12 4G',      image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
+  { id: 'redmi-note-11-pro-plus-5g', brand: 'xiaomi', name: 'Redmi Note 11 Pro+ 5G', image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
+  { id: 'redmi-note-11-pro-5g',      brand: 'xiaomi', name: 'Redmi Note 11 Pro 5G',  image: '', storage: mp({ '128 Go': 1 }) },
+  { id: 'redmi-note-11-pro',         brand: 'xiaomi', name: 'Redmi Note 11 Pro',     image: '', storage: mp({ '64 Go': 1, '128 Go': 1 }) },
+  { id: 'redmi-note-11s-5g',         brand: 'xiaomi', name: 'Redmi Note 11S 5G',     image: '', storage: mp({ '128 Go': 1 }) },
+  { id: 'redmi-note-11s',            brand: 'xiaomi', name: 'Redmi Note 11S',        image: '', storage: mp({ '64 Go': 1, '128 Go': 1 }) },
+  { id: 'redmi-note-11',             brand: 'xiaomi', name: 'Redmi Note 11',         image: '', storage: mp({ '64 Go': 1, '128 Go': 1 }) },
+  { id: 'redmi-note-10t',            brand: 'xiaomi', name: 'Redmi Note 10T',        image: '', storage: mp({ '64 Go': 1, '128 Go': 1 }) },
+  { id: 'redmi-note-10-pro-5g',      brand: 'xiaomi', name: 'Redmi Note 10 Pro 5G',  image: '', storage: mp({ '128 Go': 1 }) },
+  { id: 'redmi-note-10-pro',         brand: 'xiaomi', name: 'Redmi Note 10 Pro',     image: '', storage: mp({ '64 Go': 1, '128 Go': 1 }) },
+  { id: 'redmi-note-10s',            brand: 'xiaomi', name: 'Redmi Note 10S',        image: '', storage: mp({ '64 Go': 1, '128 Go': 1 }) },
+  { id: 'redmi-note-10-5g',          brand: 'xiaomi', name: 'Redmi Note 10 5G',      image: '', storage: mp({ '64 Go': 1, '128 Go': 1 }) },
+  // ----- Redmi -----
+  { id: 'redmi-15c-5g',    brand: 'xiaomi', name: 'Redmi 15C 5G',    image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
+  { id: 'redmi-15c-4g',    brand: 'xiaomi', name: 'Redmi 15C 4G',    image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
+  { id: 'redmi-15-5g',     brand: 'xiaomi', name: 'Redmi 15 5G',     image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
+  { id: 'redmi-15-4g',     brand: 'xiaomi', name: 'Redmi 15 4G',     image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
+  { id: 'redmi-14c-5g',    brand: 'xiaomi', name: 'Redmi 14C 5G',    image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
+  { id: 'redmi-14c',       brand: 'xiaomi', name: 'Redmi 14C',       image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
+  { id: 'redmi-13c-5g',    brand: 'xiaomi', name: 'Redmi 13C 5G',    image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
+  { id: 'redmi-13c',       brand: 'xiaomi', name: 'Redmi 13C',       image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
+  { id: 'redmi-13',        brand: 'xiaomi', name: 'Redmi 13',        image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
+  { id: 'redmi-12-5g',     brand: 'xiaomi', name: 'Redmi 12 5G',     image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
+  { id: 'redmi-12-4g',     brand: 'xiaomi', name: 'Redmi 12 4G',     image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
+  { id: 'redmi-12c',       brand: 'xiaomi', name: 'Redmi 12C',       image: '', storage: mp({ '64 Go': 1, '128 Go': 1 }) },
+  { id: 'redmi-10c',       brand: 'xiaomi', name: 'Redmi 10C',       image: '', storage: mp({ '64 Go': 1, '128 Go': 1 }) },
+  { id: 'redmi-10-2022',   brand: 'xiaomi', name: 'Redmi 10 (2022)', image: '', storage: mp({ '64 Go': 1, '128 Go': 1 }) },
+  { id: 'redmi-10a',       brand: 'xiaomi', name: 'Redmi 10A',       image: '', storage: mp({ '32 Go': 1, '64 Go': 1 }) },
+  { id: 'redmi-10',        brand: 'xiaomi', name: 'Redmi 10',        image: '', storage: mp({ '64 Go': 1, '128 Go': 1 }) },
+  { id: 'redmi-9c',        brand: 'xiaomi', name: 'Redmi 9C',        image: '', storage: mp({ '32 Go': 1, '64 Go': 1, '128 Go': 1 }) },
+  { id: 'redmi-9at',       brand: 'xiaomi', name: 'Redmi 9AT',       image: '', storage: mp({ '32 Go': 1 }) },
+  { id: 'redmi-9a',        brand: 'xiaomi', name: 'Redmi 9A',        image: '', storage: mp({ '32 Go': 1 }) },
+  { id: 'redmi-9t',        brand: 'xiaomi', name: 'Redmi 9T',        image: '', storage: mp({ '64 Go': 1, '128 Go': 1 }) },
+  { id: 'redmi-9',         brand: 'xiaomi', name: 'Redmi 9',         image: '', storage: mp({ '32 Go': 1, '64 Go': 1 }) },
+  { id: 'redmi-8a',        brand: 'xiaomi', name: 'Redmi 8A',        image: '', storage: mp({ '32 Go': 1, '64 Go': 1 }) },
+  { id: 'redmi-8',         brand: 'xiaomi', name: 'Redmi 8',         image: '', storage: mp({ '32 Go': 1, '64 Go': 1 }) },
+  { id: 'redmi-7a',        brand: 'xiaomi', name: 'Redmi 7A',        image: '', storage: mp({ '16 Go': 1, '32 Go': 1 }) },
+  { id: 'redmi-7',         brand: 'xiaomi', name: 'Redmi 7',         image: '', storage: mp({ '32 Go': 1, '64 Go': 1 }) },
+  { id: 'redmi-6a',        brand: 'xiaomi', name: 'Redmi 6A',        image: '', storage: mp({ '16 Go': 1, '32 Go': 1 }) },
+  { id: 'redmi-6',         brand: 'xiaomi', name: 'Redmi 6',         image: '', storage: mp({ '32 Go': 1, '64 Go': 1 }) },
+  { id: 'redmi-5-plus',    brand: 'xiaomi', name: 'Redmi 5 Plus',    image: '', storage: mp({ '32 Go': 1, '64 Go': 1 }) },
+  { id: 'redmi-a7-pro',    brand: 'xiaomi', name: 'Redmi A7 Pro',    image: '', storage: mp({ '128 Go': 1 }) },
+  { id: 'redmi-a5',        brand: 'xiaomi', name: 'Redmi A5',        image: '', storage: mp({ '64 Go': 1, '128 Go': 1 }) },
+  { id: 'redmi-a3',        brand: 'xiaomi', name: 'Redmi A3',        image: '', storage: mp({ '64 Go': 1, '128 Go': 1 }) },
+  // ----- Poco -----
+  { id: 'poco-f8-ultra',   brand: 'xiaomi', name: 'Poco F8 Ultra',   image: '', storage: mp({ '256 Go': 1, '512 Go': 1, '1 To': 1 }) },
+  { id: 'poco-f8-pro',     brand: 'xiaomi', name: 'Poco F8 Pro',     image: '', storage: mp({ '256 Go': 1, '512 Go': 1 }) },
+  { id: 'poco-f7-ultra',   brand: 'xiaomi', name: 'Poco F7 Ultra',   image: '', storage: mp({ '256 Go': 1, '512 Go': 1 }) },
+  { id: 'poco-f7-pro',     brand: 'xiaomi', name: 'Poco F7 Pro',     image: '', storage: mp({ '256 Go': 1, '512 Go': 1 }) },
+  { id: 'poco-f7-5g',      brand: 'xiaomi', name: 'Poco F7 5G',      image: '', storage: mp({ '256 Go': 1, '512 Go': 1 }) },
+  { id: 'poco-f6-pro',     brand: 'xiaomi', name: 'Poco F6 Pro',     image: '', storage: mp({ '256 Go': 1, '512 Go': 1, '1 To': 1 }) },
+  { id: 'poco-f6',         brand: 'xiaomi', name: 'Poco F6',         image: '', storage: mp({ '256 Go': 1, '512 Go': 1 }) },
+  { id: 'poco-f5-pro',     brand: 'xiaomi', name: 'Poco F5 Pro',     image: '', storage: mp({ '256 Go': 1, '512 Go': 1 }) },
+  { id: 'poco-f5',         brand: 'xiaomi', name: 'Poco F5',         image: '', storage: mp({ '256 Go': 1 }) },
+  { id: 'poco-f4-5g',      brand: 'xiaomi', name: 'Poco F4 5G',      image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
+  { id: 'poco-f3',         brand: 'xiaomi', name: 'Poco F3',         image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
+  { id: 'poco-f2-pro',     brand: 'xiaomi', name: 'Poco F2 Pro',     image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
+  { id: 'poco-f1',         brand: 'xiaomi', name: 'Poco F1',         image: '', storage: mp({ '64 Go': 1, '128 Go': 1 }) },
+  { id: 'poco-x8-pro-max', brand: 'xiaomi', name: 'Poco X8 Pro Max', image: '', storage: mp({ '256 Go': 1, '512 Go': 1 }) },
+  { id: 'poco-x8-pro',     brand: 'xiaomi', name: 'Poco X8 Pro',     image: '', storage: mp({ '256 Go': 1, '512 Go': 1 }) },
+  { id: 'poco-x7-pro',     brand: 'xiaomi', name: 'Poco X7 Pro',     image: '', storage: mp({ '256 Go': 1, '512 Go': 1 }) },
+  { id: 'poco-x7',         brand: 'xiaomi', name: 'Poco X7',         image: '', storage: mp({ '256 Go': 1, '512 Go': 1 }) },
+  { id: 'poco-x6-pro',     brand: 'xiaomi', name: 'Poco X6 Pro',     image: '', storage: mp({ '256 Go': 1, '512 Go': 1 }) },
+  { id: 'poco-x6',         brand: 'xiaomi', name: 'Poco X6',         image: '', storage: mp({ '256 Go': 1, '512 Go': 1 }) },
+  { id: 'poco-x5-pro-5g',  brand: 'xiaomi', name: 'Poco X5 Pro 5G',  image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
+  { id: 'poco-x5-5g',      brand: 'xiaomi', name: 'Poco X5 5G',      image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
+  { id: 'poco-x4-pro-5g',  brand: 'xiaomi', name: 'Poco X4 Pro 5G',  image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
+  { id: 'poco-x4-gt',      brand: 'xiaomi', name: 'Poco X4 GT',      image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
+  { id: 'poco-x3-pro',     brand: 'xiaomi', name: 'Poco X3 Pro',     image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
+  { id: 'poco-x3-nfc',     brand: 'xiaomi', name: 'Poco X3 NFC',     image: '', storage: mp({ '64 Go': 1, '128 Go': 1 }) },
+  { id: 'poco-x3',         brand: 'xiaomi', name: 'Poco X3',         image: '', storage: mp({ '64 Go': 1, '128 Go': 1 }) },
+  { id: 'poco-m7-plus',    brand: 'xiaomi', name: 'Poco M7 Plus',    image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
+  { id: 'poco-m7-5g',      brand: 'xiaomi', name: 'Poco M7 5G',      image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
+  { id: 'poco-m7-4g',      brand: 'xiaomi', name: 'Poco M7 4G',      image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
+  { id: 'poco-m6-pro',     brand: 'xiaomi', name: 'Poco M6 Pro',     image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
+  { id: 'poco-m6-5g',      brand: 'xiaomi', name: 'Poco M6 5G',      image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
+  { id: 'poco-m6-4g',      brand: 'xiaomi', name: 'Poco M6 4G',      image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
+  // ========================= HONOR =========================
+  // ----- Magic -----
+  { id: 'honor-magic-7-pro',  brand: 'honor', name: 'Honor Magic 7 Pro',  image: '', storage: mp({ '512 Go': 1, '1 To': 1 }) },
   { id: 'honor-magic-7-lite', brand: 'honor', name: 'Honor Magic 7 Lite', image: '', storage: mp({ '256 Go': 1, '512 Go': 1 }) },
-  { id: 'honor-magic-6-pro', brand: 'honor', name: 'Honor Magic 6 Pro', image: '', storage: mp({ '256 Go': 1, '512 Go': 1 }) },
+  { id: 'honor-magic-6-pro',  brand: 'honor', name: 'Honor Magic 6 Pro',  image: '', storage: mp({ '256 Go': 1, '512 Go': 1 }) },
   { id: 'honor-magic-6-lite', brand: 'honor', name: 'Honor Magic 6 Lite', image: '', storage: mp({ '256 Go': 1 }) },
-  { id: 'honor-magic-5-pro', brand: 'honor', name: 'Honor Magic 5 Pro', image: '', storage: mp({ '256 Go': 1, '512 Go': 1 }) },
-  { id: 'honor-magic-v3',    brand: 'honor', name: 'Honor Magic V3 (pliable)', image: '', storage: mp({ '512 Go': 1 }) },
-  { id: 'honor-magic-v2',    brand: 'honor', name: 'Honor Magic V2 (pliable)', image: '', storage: mp({ '512 Go': 1 }) },
-  // -- Serie numerotee --
-  { id: 'honor-400-pro',     brand: 'honor', name: 'Honor 400 Pro',     image: '', storage: mp({ '512 Go': 1 }) },
-  { id: 'honor-400',         brand: 'honor', name: 'Honor 400',         image: '', storage: mp({ '256 Go': 1, '512 Go': 1 }) },
-  { id: 'honor-400-lite',    brand: 'honor', name: 'Honor 400 Lite',    image: '', storage: mp({ '256 Go': 1 }) },
-  { id: 'honor-200-pro',     brand: 'honor', name: 'Honor 200 Pro',     image: '', storage: mp({ '512 Go': 1 }) },
-  { id: 'honor-200',         brand: 'honor', name: 'Honor 200',         image: '', storage: mp({ '256 Go': 1, '512 Go': 1 }) },
-  { id: 'honor-200-lite',    brand: 'honor', name: 'Honor 200 Lite',    image: '', storage: mp({ '256 Go': 1 }) },
-  { id: 'honor-90',          brand: 'honor', name: 'Honor 90',          image: '', storage: mp({ '256 Go': 1, '512 Go': 1 }) },
-  { id: 'honor-90-lite',     brand: 'honor', name: 'Honor 90 Lite',     image: '', storage: mp({ '256 Go': 1 }) },
-  // -- Serie X --
-  { id: 'honor-x9c',         brand: 'honor', name: 'Honor X9c',         image: '', storage: mp({ '256 Go': 1, '512 Go': 1 }) },
-  { id: 'honor-x9b',         brand: 'honor', name: 'Honor X9b',         image: '', storage: mp({ '256 Go': 1, '512 Go': 1 }) },
-  { id: 'honor-x8b',         brand: 'honor', name: 'Honor X8b',         image: '', storage: mp({ '256 Go': 1, '512 Go': 1 }) },
-  { id: 'honor-x7b',         brand: 'honor', name: 'Honor X7b',         image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
-  { id: 'honor-x6b',         brand: 'honor', name: 'Honor X6b',         image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
-  // ===== OPPO (du plus recent au plus ancien, par gamme) =====
-  // -- Find X --
+  { id: 'honor-magic-5-pro',  brand: 'honor', name: 'Honor Magic 5 Pro',  image: '', storage: mp({ '256 Go': 1, '512 Go': 1 }) },
+  { id: 'honor-magic-5-lite', brand: 'honor', name: 'Honor Magic 5 Lite', image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
+  // ----- Magic V (pliables) -----
+  { id: 'honor-magic-v3',     brand: 'honor', name: 'Honor Magic V3',     image: '', storage: mp({ '512 Go': 1 }) },
+  { id: 'honor-magic-v2',     brand: 'honor', name: 'Honor Magic V2',     image: '', storage: mp({ '512 Go': 1 }) },
+  // ----- Serie numerotee -----
+  { id: 'honor-400-pro',      brand: 'honor', name: 'Honor 400 Pro',      image: '', storage: mp({ '512 Go': 1 }) },
+  { id: 'honor-400',          brand: 'honor', name: 'Honor 400',          image: '', storage: mp({ '256 Go': 1, '512 Go': 1 }) },
+  { id: 'honor-400-lite',     brand: 'honor', name: 'Honor 400 Lite',     image: '', storage: mp({ '256 Go': 1 }) },
+  { id: 'honor-200-pro',      brand: 'honor', name: 'Honor 200 Pro',      image: '', storage: mp({ '512 Go': 1 }) },
+  { id: 'honor-200',          brand: 'honor', name: 'Honor 200',          image: '', storage: mp({ '256 Go': 1, '512 Go': 1 }) },
+  { id: 'honor-200-lite',     brand: 'honor', name: 'Honor 200 Lite',     image: '', storage: mp({ '256 Go': 1 }) },
+  { id: 'honor-90',           brand: 'honor', name: 'Honor 90',           image: '', storage: mp({ '256 Go': 1, '512 Go': 1 }) },
+  { id: 'honor-90-lite',      brand: 'honor', name: 'Honor 90 Lite',      image: '', storage: mp({ '256 Go': 1 }) },
+  // ----- Serie X -----
+  { id: 'honor-x9c',          brand: 'honor', name: 'Honor X9c',          image: '', storage: mp({ '256 Go': 1, '512 Go': 1 }) },
+  { id: 'honor-x9b',          brand: 'honor', name: 'Honor X9b',          image: '', storage: mp({ '256 Go': 1, '512 Go': 1 }) },
+  { id: 'honor-x8c',          brand: 'honor', name: 'Honor X8c',          image: '', storage: mp({ '256 Go': 1 }) },
+  { id: 'honor-x8b',          brand: 'honor', name: 'Honor X8b',          image: '', storage: mp({ '256 Go': 1, '512 Go': 1 }) },
+  { id: 'honor-x7c',          brand: 'honor', name: 'Honor X7c',          image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
+  { id: 'honor-x7b',          brand: 'honor', name: 'Honor X7b',          image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
+  { id: 'honor-x6b',          brand: 'honor', name: 'Honor X6b',          image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
+  // ========================= OPPO =========================
+  // ----- Find X -----
   { id: 'oppo-find-x8-pro',   brand: 'oppo', name: 'Oppo Find X8 Pro',   image: '', storage: mp({ '256 Go': 1, '512 Go': 1, '1 To': 1 }) },
   { id: 'oppo-find-x8',       brand: 'oppo', name: 'Oppo Find X8',       image: '', storage: mp({ '256 Go': 1, '512 Go': 1 }) },
   { id: 'oppo-find-x7-ultra', brand: 'oppo', name: 'Oppo Find X7 Ultra', image: '', storage: mp({ '256 Go': 1, '512 Go': 1 }) },
   { id: 'oppo-find-x6-pro',   brand: 'oppo', name: 'Oppo Find X6 Pro',   image: '', storage: mp({ '256 Go': 1, '512 Go': 1 }) },
-  { id: 'oppo-find-x5-pro',   brand: 'oppo', name: 'Oppo Find X5 Pro',   image: '', storage: mp({ '256 Go': 1 }) },
-  { id: 'oppo-find-x5',       brand: 'oppo', name: 'Oppo Find X5',       image: '', storage: mp({ '256 Go': 1 }) },
-  // -- Find N (pliable) --
-  { id: 'oppo-find-n5',       brand: 'oppo', name: 'Oppo Find N5 (pliable)', image: '', storage: mp({ '512 Go': 1, '1 To': 1 }) },
-  { id: 'oppo-find-n3',       brand: 'oppo', name: 'Oppo Find N3 (pliable)', image: '', storage: mp({ '512 Go': 1 }) },
-  // -- Reno --
+  // ----- Find N (pliables) -----
+  { id: 'oppo-find-n5',       brand: 'oppo', name: 'Oppo Find N5',       image: '', storage: mp({ '512 Go': 1, '1 To': 1 }) },
+  { id: 'oppo-find-n3',       brand: 'oppo', name: 'Oppo Find N3',       image: '', storage: mp({ '512 Go': 1 }) },
+  // ----- Reno -----
   { id: 'oppo-reno-13-pro',   brand: 'oppo', name: 'Oppo Reno 13 Pro',   image: '', storage: mp({ '256 Go': 1, '512 Go': 1 }) },
   { id: 'oppo-reno-13',       brand: 'oppo', name: 'Oppo Reno 13',       image: '', storage: mp({ '256 Go': 1, '512 Go': 1 }) },
   { id: 'oppo-reno-12-pro',   brand: 'oppo', name: 'Oppo Reno 12 Pro',   image: '', storage: mp({ '256 Go': 1, '512 Go': 1 }) },
@@ -211,32 +328,31 @@ const INITIAL_PRODUCTS = [
   { id: 'oppo-reno-11',       brand: 'oppo', name: 'Oppo Reno 11',       image: '', storage: mp({ '256 Go': 1 }) },
   { id: 'oppo-reno-10-pro',   brand: 'oppo', name: 'Oppo Reno 10 Pro',   image: '', storage: mp({ '256 Go': 1 }) },
   { id: 'oppo-reno-10',       brand: 'oppo', name: 'Oppo Reno 10',       image: '', storage: mp({ '256 Go': 1 }) },
-  { id: 'oppo-reno-8-pro',    brand: 'oppo', name: 'Oppo Reno 8 Pro',    image: '', storage: mp({ '256 Go': 1 }) },
-  { id: 'oppo-reno-8',        brand: 'oppo', name: 'Oppo Reno 8',        image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
-  // -- Serie A --
+  // ----- Serie A -----
   { id: 'oppo-a98',           brand: 'oppo', name: 'Oppo A98',           image: '', storage: mp({ '256 Go': 1 }) },
   { id: 'oppo-a80',           brand: 'oppo', name: 'Oppo A80',           image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
   { id: 'oppo-a79',           brand: 'oppo', name: 'Oppo A79',           image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
   { id: 'oppo-a78',           brand: 'oppo', name: 'Oppo A78',           image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
   { id: 'oppo-a60',           brand: 'oppo', name: 'Oppo A60',           image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
   { id: 'oppo-a40',           brand: 'oppo', name: 'Oppo A40',           image: '', storage: mp({ '128 Go': 1 }) },
-  // ===== GOOGLE (du plus recent au plus ancien) =====
-  { id: 'pixel-10-pro-xl', brand: 'google', name: 'Pixel 10 Pro XL', image: '', storage: mp({ '256 Go': 1, '512 Go': 1, '1 To': 1 }) },
-  { id: 'pixel-10-pro',    brand: 'google', name: 'Pixel 10 Pro',    image: '', storage: mp({ '128 Go': 1, '256 Go': 1, '512 Go': 1 }) },
-  { id: 'pixel-10',        brand: 'google', name: 'Pixel 10',        image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
-  { id: 'pixel-9-pro-fold', brand: 'google', name: 'Pixel 9 Pro Fold', image: '', storage: mp({ '256 Go': 1, '512 Go': 1 }) },
-  { id: 'pixel-9-pro-xl',  brand: 'google', name: 'Pixel 9 Pro XL',  image: '', storage: mp({ '256 Go': 1, '512 Go': 1, '1 To': 1 }) },
-  { id: 'pixel-9-pro',     brand: 'google', name: 'Pixel 9 Pro',     image: '', storage: mp({ '128 Go': 1, '256 Go': 1, '512 Go': 1 }) },
-  { id: 'pixel-9',         brand: 'google', name: 'Pixel 9',         image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
-  { id: 'pixel-8-pro',     brand: 'google', name: 'Pixel 8 Pro',     image: '', storage: mp({ '128 Go': 1, '256 Go': 1, '512 Go': 1, '1 To': 1 }) },
-  { id: 'pixel-8',         brand: 'google', name: 'Pixel 8',         image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
-  { id: 'pixel-8a',        brand: 'google', name: 'Pixel 8a',        image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
-  { id: 'pixel-7-pro',     brand: 'google', name: 'Pixel 7 Pro',     image: '', storage: mp({ '128 Go': 1, '256 Go': 1, '512 Go': 1 }) },
-  { id: 'pixel-7',         brand: 'google', name: 'Pixel 7',         image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
-  { id: 'pixel-7a',        brand: 'google', name: 'Pixel 7a',        image: '', storage: mp({ '128 Go': 1 }) },
-  { id: 'pixel-6-pro',     brand: 'google', name: 'Pixel 6 Pro',     image: '', storage: mp({ '128 Go': 1, '256 Go': 1, '512 Go': 1 }) },
-  { id: 'pixel-6',         brand: 'google', name: 'Pixel 6',         image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
-  { id: 'pixel-6a',        brand: 'google', name: 'Pixel 6a',        image: '', storage: mp({ '128 Go': 1 }) },
+  // ========================= GOOGLE =========================
+  { id: 'pixel-10-pro-fold', brand: 'google', name: 'Pixel 10 Pro Fold', image: '', storage: mp({ '256 Go': 1, '512 Go': 1, '1 To': 1 }) },
+  { id: 'pixel-10-pro-xl',   brand: 'google', name: 'Pixel 10 Pro XL',   image: '', storage: mp({ '256 Go': 1, '512 Go': 1, '1 To': 1 }) },
+  { id: 'pixel-10-pro',      brand: 'google', name: 'Pixel 10 Pro',      image: '', storage: mp({ '128 Go': 1, '256 Go': 1, '512 Go': 1 }) },
+  { id: 'pixel-10',          brand: 'google', name: 'Pixel 10',          image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
+  { id: 'pixel-9-pro-fold',  brand: 'google', name: 'Pixel 9 Pro Fold',  image: '', storage: mp({ '256 Go': 1, '512 Go': 1 }) },
+  { id: 'pixel-9-pro-xl',    brand: 'google', name: 'Pixel 9 Pro XL',    image: '', storage: mp({ '256 Go': 1, '512 Go': 1, '1 To': 1 }) },
+  { id: 'pixel-9-pro',       brand: 'google', name: 'Pixel 9 Pro',       image: '', storage: mp({ '128 Go': 1, '256 Go': 1, '512 Go': 1 }) },
+  { id: 'pixel-9',           brand: 'google', name: 'Pixel 9',           image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
+  { id: 'pixel-8-pro',       brand: 'google', name: 'Pixel 8 Pro',       image: '', storage: mp({ '128 Go': 1, '256 Go': 1, '512 Go': 1, '1 To': 1 }) },
+  { id: 'pixel-8',           brand: 'google', name: 'Pixel 8',           image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
+  { id: 'pixel-8a',          brand: 'google', name: 'Pixel 8a',          image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
+  { id: 'pixel-7-pro',       brand: 'google', name: 'Pixel 7 Pro',       image: '', storage: mp({ '128 Go': 1, '256 Go': 1, '512 Go': 1 }) },
+  { id: 'pixel-7',           brand: 'google', name: 'Pixel 7',           image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
+  { id: 'pixel-7a',          brand: 'google', name: 'Pixel 7a',          image: '', storage: mp({ '128 Go': 1 }) },
+  { id: 'pixel-6-pro',       brand: 'google', name: 'Pixel 6 Pro',       image: '', storage: mp({ '128 Go': 1, '256 Go': 1, '512 Go': 1 }) },
+  { id: 'pixel-6',           brand: 'google', name: 'Pixel 6',           image: '', storage: mp({ '128 Go': 1, '256 Go': 1 }) },
+  { id: 'pixel-6a',          brand: 'google', name: 'Pixel 6a',          image: '', storage: mp({ '128 Go': 1 }) },
 ];
 
 // ================================================================
@@ -1293,6 +1409,8 @@ function ProductsTab({ theme, brands, products, setProducts }) {
   const [creating, setCreating] = useState(false);
   const [openBrand, setOpenBrand] = useState(brands[0]?.id || null);
   const [q, setQ] = useState('');
+  const [dragId, setDragId] = useState(null);   // produit en cours de glissement
+  const [overId, setOverId] = useState(null);   // produit survolé
 
   const handleSave = (prod) => {
     if (editing) setProducts(products.map(p => p.id === prod.id ? prod : p));
@@ -1303,23 +1421,34 @@ function ProductsTab({ theme, brands, products, setProducts }) {
     if (window.confirm('Supprimer définitivement ce produit ?')) setProducts(products.filter(p => p.id !== id));
   };
 
-  // Déplace un produit vers le haut/bas À L'INTÉRIEUR de sa marque.
-  // On réordonne le tableau global "products" en conséquence.
+  // Déplace un produit vers le haut/bas À L'INTÉRIEUR de sa marque (flèches).
   const moveWithinBrand = (productId, direction) => {
     const product = products.find(p => p.id === productId);
     if (!product) return;
-    // indices (dans le tableau global) des produits de la même marque, dans l'ordre
     const sameBrandIndices = products
       .map((p, i) => ({ p, i }))
       .filter(x => x.p.brand === product.brand)
       .map(x => x.i);
     const posInBrand = sameBrandIndices.findIndex(i => products[i].id === productId);
     const targetPos = posInBrand + direction;
-    if (targetPos < 0 || targetPos >= sameBrandIndices.length) return; // déjà en bout
+    if (targetPos < 0 || targetPos >= sameBrandIndices.length) return;
     const idxA = sameBrandIndices[posInBrand];
     const idxB = sameBrandIndices[targetPos];
     const next = [...products];
     [next[idxA], next[idxB]] = [next[idxB], next[idxA]];
+    setProducts(next);
+  };
+
+  // Réordonne par glisser-déposer : place le produit "sourceId" juste avant "targetId"
+  // (uniquement si même marque), en réordonnant le tableau global.
+  const reorderByDrag = (sourceId, targetId) => {
+    if (!sourceId || !targetId || sourceId === targetId) return;
+    const src = products.find(p => p.id === sourceId);
+    const tgt = products.find(p => p.id === targetId);
+    if (!src || !tgt || src.brand !== tgt.brand) return; // pas de déplacement entre marques
+    const next = products.filter(p => p.id !== sourceId);
+    const targetIndex = next.findIndex(p => p.id === targetId);
+    next.splice(targetIndex, 0, src);
     setProducts(next);
   };
 
@@ -1332,7 +1461,7 @@ function ProductsTab({ theme, brands, products, setProducts }) {
   return (
     <Card theme={theme} title={`Produits (${products.length})`}>
       <p style={{ fontSize: '0.85rem', color: theme.textMuted, margin: '0 0 14px' }}>
-        Les modèles sont regroupés par marque. Utilisez les flèches pour les remonter ou les descendre dans l'ordre d'affichage du site.
+        Les modèles sont regroupés par marque. Glissez-déposez une ligne (poignée ⋮⋮ à gauche) ou utilisez les flèches pour réorganiser l'ordre d'affichage. Le réordonnancement reste à l'intérieur de chaque marque.
       </p>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Rechercher un modèle..." className="rc-input" style={{ ...inputStyle(theme), maxWidth: 280 }} />
@@ -1368,7 +1497,24 @@ function ProductsTab({ theme, brands, products, setProducts }) {
               {isOpen && (
                 <div style={{ display: 'grid', gap: 6, padding: 10 }}>
                   {brandProducts.map((p, idx) => (
-                    <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: 10, borderRadius: 10, background: theme.surface, border: `1px solid ${theme.primary}10` }}>
+                    <div
+                      key={p.id}
+                      draggable={query === ''}
+                      onDragStart={(e) => { if (query !== '') return; setDragId(p.id); e.dataTransfer.effectAllowed = 'move'; }}
+                      onDragOver={(e) => { if (query !== '') return; e.preventDefault(); if (overId !== p.id) setOverId(p.id); }}
+                      onDrop={(e) => { if (query !== '') return; e.preventDefault(); reorderByDrag(dragId, p.id); setDragId(null); setOverId(null); }}
+                      onDragEnd={() => { setDragId(null); setOverId(null); }}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 10, padding: 10, borderRadius: 10,
+                        background: theme.surface,
+                        border: `1px solid ${overId === p.id && dragId && dragId !== p.id ? theme.primary : theme.primary + '10'}`,
+                        boxShadow: overId === p.id && dragId && dragId !== p.id ? `0 -2px 0 ${theme.primary} inset` : 'none',
+                        opacity: dragId === p.id ? 0.4 : 1,
+                        transition: 'opacity 0.15s, border-color 0.15s',
+                      }}
+                    >
+                      {/* Poignée de glissement */}
+                      <span title="Glisser pour déplacer" style={{ cursor: query === '' ? 'grab' : 'default', color: theme.textMuted, fontSize: '1.1rem', lineHeight: 1, userSelect: 'none', letterSpacing: '-2px', padding: '0 2px', opacity: query === '' ? 1 : 0.3 }}>⋮⋮</span>
                       {/* Flèches de réordonnancement */}
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                         <button className="rc-btn" onClick={() => moveWithinBrand(p.id, -1)} disabled={idx === 0} title="Monter"
