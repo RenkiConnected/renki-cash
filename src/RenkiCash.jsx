@@ -1236,7 +1236,7 @@ function printInvoiceSheet({ theme, product, brand, storage, calc, evaluation, c
 
   /* Page A4 centrée à l'écran */
   .page-wrap { display: flex; justify-content: center; padding: 28px 20px; }
-  .sheet { width: 210mm; min-height: 297mm; background: #fff; padding: 18mm 18mm; box-shadow: 0 6px 24px rgba(0,0,0,0.08); border-radius: 4px; }
+  .sheet { width: 210mm; max-width: 100%; background: #fff; padding: 18mm 18mm; box-shadow: 0 6px 24px rgba(0,0,0,0.08); border-radius: 4px; }
 
   /* En-tête avec logo */
   .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid ${primary}; padding-bottom: 14px; margin-bottom: 22px; }
@@ -1273,25 +1273,27 @@ function printInvoiceSheet({ theme, product, brand, storage, calc, evaluation, c
   /* Pied de page */
   .footer { margin-top: 22px; padding-top: 12px; border-top: 1px solid #e2e8f0; font-size: 8.5pt; color: #94a3b8; text-align: center; }
 
-  /* Règles d'impression */
+  /* Règles d'impression — simples et fiables (testé Chrome/Edge/Firefox) */
   @media print {
-    @page { size: A4; margin: 0; }
-    html, body { background: #fff; }
+    @page { size: A4; margin: 12mm; }
+    html, body { background: #fff !important; margin: 0; padding: 0; }
     .toolbar { display: none !important; }
-    .page-wrap { padding: 0; }
-    .sheet { box-shadow: none; border-radius: 0; width: 100%; min-height: 100vh; padding: 14mm 14mm; }
+    .page-wrap { display: block !important; padding: 0 !important; margin: 0 !important; }
+    .sheet { box-shadow: none !important; border-radius: 0 !important; padding: 0 !important; margin: 0 !important; width: auto !important; min-height: auto !important; max-width: 100% !important; }
+    .card { break-inside: avoid; }
+    .price-box, .validity, .signatures { break-inside: avoid; }
   }
 </style></head>
 <body>
   <div class="toolbar">
-    <button class="btn-print" onclick="window.print()">🖨 Imprimer cette fiche</button>
+    <button class="btn-print" id="btnPrint" disabled onclick="doPrint()">⏳ Préparation...</button>
     <button class="btn-close" onclick="window.close()">Fermer</button>
   </div>
 
   <div class="page-wrap">
     <div class="sheet">
       <div class="header">
-        <img class="logo" src="${LOGO_DATA_URL}" alt="Care Reprise" />
+        <img class="logo" id="logoImg" src="${LOGO_DATA_URL}" alt="Care Reprise" />
         <div class="right">
           <div class="title-line">Offre de rachat</div>
           <div class="dates">
@@ -1352,6 +1354,30 @@ function printInvoiceSheet({ theme, product, brand, storage, calc, evaluation, c
       </div>
     </div>
   </div>
+  <script>
+    // On attend que le logo soit chargé pour activer le bouton.
+    // Évite l'aperçu vide sur Chrome Windows (cas où l'image base64 est encore en décodage).
+    function readyPrint() {
+      var btn = document.getElementById('btnPrint');
+      btn.disabled = false;
+      btn.textContent = '🖨 Imprimer cette fiche';
+    }
+    function doPrint() {
+      // Petit délai pour laisser le rendu finir avant d'ouvrir l'aperçu
+      setTimeout(function(){ window.print(); }, 100);
+    }
+    var img = document.getElementById('logoImg');
+    if (img && img.complete && img.naturalWidth > 0) {
+      readyPrint();
+    } else if (img) {
+      img.addEventListener('load', readyPrint);
+      img.addEventListener('error', readyPrint); // même si le logo échoue, on permet d'imprimer
+      // Sécurité : timeout au cas où ni load ni error ne déclenchent
+      setTimeout(readyPrint, 1500);
+    } else {
+      readyPrint();
+    }
+  </script>
 </body></html>`;
 
   const w = window.open('', '_blank', 'width=920,height=1000');
