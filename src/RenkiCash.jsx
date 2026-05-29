@@ -625,7 +625,7 @@ export default function RenkiCash() {
           : <DashboardLogin theme={theme} onUnlock={() => setDashboardUnlocked(true)} />
         )}
         {view === 'history' && (historyUnlocked
-          ? <HistoryView theme={theme} history={history} setHistory={setHistory} onLock={() => setHistoryUnlocked(false)} />
+          ? <HistoryView theme={theme} history={history} setHistory={setHistory} products={products} brands={brands} onLock={() => setHistoryUnlocked(false)} />
           : <HistoryLogin theme={theme} onUnlock={() => setHistoryUnlocked(true)} />
         )}
       </main>
@@ -1194,115 +1194,163 @@ function CustomerView({ theme, customer, setCustomer, onBack, onConfirm }) {
   );
 }
 
-// ================== RESULT VIEW (avec fiche imprimable A4) ==================
+// ================== IMPRESSION DE LA FICHE A4 (fenêtre dédiée) ==================
+// Ouvre une nouvelle fenêtre avec le HTML de la fiche, lance l'impression, ferme.
+// Marche à coup sûr car indépendant du DOM React et des styles de la page.
+function printInvoiceSheet({ theme, product, brand, storage, calc, evaluation, customer, date }) {
+  const condLabels = { 'neuf': 'Neuf', 'comme-neuf': 'Comme neuf', 'bon': 'Bon état', 'moyen': 'État moyen', 'mauvais': 'Mauvais', 'tres-mauvais': 'Très mauvais' };
+  const battLabels = { 'fonctionnelle': 'Fonctionnelle', 'a-remplacer': 'À remplacer', 'non-fonctionnelle': 'Non fonctionnelle' };
+  const ref = date ? new Date(date) : new Date();
+  const validUntil = new Date(ref.getTime() + 15 * 24 * 3600 * 1000);
+  const fmt = (d) => d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+  const siteName = esc(theme?.siteName || 'Care Reprise');
+  const primary = theme?.primary || '#00B8D4';
+  const primaryDark = theme?.primaryDark || '#007a8c';
+  const primaryLight = theme?.primaryLight || '#e0f7fa';
+
+  const html = `<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><title>Fiche de reprise - ${esc(customer?.lastName || '')} ${esc(customer?.firstName || '')}</title>
+<style>
+  @page { size: A4; margin: 14mm; }
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, 'Segoe UI', Roboto, Arial, sans-serif; color: #000; margin: 0; padding: 0; background: #fff; }
+  h3 { font-size: 12pt; margin: 0 0 6px; text-transform: uppercase; letter-spacing: 0.05em; color: ${primaryDark}; }
+  table { width: 100%; border-collapse: collapse; font-size: 11pt; }
+  td { padding: 5px 0; vertical-align: top; }
+  td.lbl { color: #555; width: 38%; }
+  td.val { font-weight: 600; }
+  .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid ${primary}; padding-bottom: 10px; margin-bottom: 16px; }
+  .header .site { font-size: 18pt; font-weight: 800; color: ${primaryDark}; }
+  .header .sub { font-size: 10pt; color: #555; }
+  .header .dates { text-align: right; font-size: 10pt; }
+  .section { margin-bottom: 16px; }
+  .price-box { padding: 16px; background: ${primaryLight}; border: 2px solid ${primary}; border-radius: 10px; text-align: center; margin-bottom: 14px; }
+  .price-box .lbl { font-size: 10pt; font-weight: 700; color: ${primaryDark}; text-transform: uppercase; letter-spacing: 0.06em; }
+  .price-box .amt { font-size: 30pt; font-weight: 800; color: ${primaryDark}; line-height: 1.05; margin-top: 2px; }
+  .validity { padding: 10px; background: #fff7ed; border: 1.5px solid #fdba74; border-radius: 8px; font-size: 10.5pt; text-align: center; margin-bottom: 18px; color: #9a3412; font-weight: 600; }
+  .signatures { display: flex; gap: 24px; margin-top: 24px; font-size: 10pt; }
+  .signatures .col { flex: 1; }
+  .signatures .col .label { color: #555; margin-bottom: 36px; }
+  .signatures .col .line { border-top: 1px solid #999; }
+</style></head><body onload="window.focus(); window.print();">
+  <div class="header">
+    <div>
+      <div class="site">${siteName}</div>
+      <div class="sub">Offre de rachat de smartphone</div>
+    </div>
+    <div class="dates">
+      <div><strong>Date :</strong> ${fmt(ref)}</div>
+      <div><strong>Valable jusqu'au :</strong> ${fmt(validUntil)}</div>
+    </div>
+  </div>
+  <div class="section">
+    <h3>Client</h3>
+    <table><tbody>
+      <tr><td class="lbl">Nom et prénom</td><td class="val">${esc(customer?.firstName)} ${esc(customer?.lastName)}</td></tr>
+      <tr><td class="lbl">Téléphone</td><td class="val">${esc(customer?.phone)}</td></tr>
+      <tr><td class="lbl">Email</td><td class="val">${esc(customer?.email)}</td></tr>
+    </tbody></table>
+  </div>
+  <div class="section">
+    <h3>Récapitulatif de l'évaluation</h3>
+    <table><tbody>
+      <tr><td class="lbl">Marque</td><td class="val">${esc(brand?.name || '')}</td></tr>
+      <tr><td class="lbl">Modèle</td><td class="val">${esc(product?.name)} (${esc(storage)})</td></tr>
+      <tr><td class="lbl">État général</td><td class="val">${esc(condLabels[evaluation?.condition] || '')}</td></tr>
+      <tr><td class="lbl">Batterie</td><td class="val">${esc(battLabels[evaluation?.battery] || '')}</td></tr>
+      <tr><td class="lbl">Caméra</td><td class="val">${esc(battLabels[evaluation?.camera] || '')}</td></tr>
+      <tr><td class="lbl">Facture &lt; 2 ans</td><td class="val">${evaluation?.invoice === 'oui' ? 'Oui' : 'Non'}</td></tr>
+    </tbody></table>
+  </div>
+  <div class="price-box">
+    <div class="lbl">Montant proposé pour la reprise</div>
+    <div class="amt">${esc(calc?.price)} €</div>
+  </div>
+  <div class="validity">⚠ Cette offre de rachat est valable uniquement <strong>15 jours</strong>, soit jusqu'au <strong>${fmt(validUntil)}</strong>.</div>
+  <div class="signatures">
+    <div class="col"><div class="label">Signature du client :</div><div class="line"></div></div>
+    <div class="col"><div class="label">Cachet du magasin :</div><div class="line"></div></div>
+  </div>
+</body></html>`;
+
+  const w = window.open('', '_blank', 'width=900,height=1000');
+  if (!w) { alert("La fenêtre d'impression a été bloquée par votre navigateur. Autorisez les pop-ups pour ce site."); return; }
+  w.document.open(); w.document.write(html); w.document.close();
+}
+
+// ================== RESULT VIEW (aperçu écran + bouton imprimer) ==================
 function ResultView({ theme, product, storage, calc, evaluation, customer, brand, onRestart }) {
   const condLabels = { 'neuf': 'Neuf', 'comme-neuf': 'Comme neuf', 'bon': 'Bon état', 'moyen': 'État moyen', 'mauvais': 'Mauvais', 'tres-mauvais': 'Très mauvais' };
   const battLabels = { 'fonctionnelle': 'Fonctionnelle', 'a-remplacer': 'À remplacer', 'non-fonctionnelle': 'Non fonctionnelle' };
-
   const today = new Date();
   const validUntil = new Date(today.getTime() + 15 * 24 * 3600 * 1000);
   const fmt = (d) => d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
-
-  const handlePrint = () => window.print();
+  const handlePrint = () => printInvoiceSheet({ theme, product, brand, storage, calc, evaluation, customer });
 
   return (
-    <>
-      {/* Styles d'impression — masque tout sauf .print-sheet et formate en A4 */}
-      <style>{`
-        @media print {
-          @page { size: A4; margin: 18mm; }
-          body * { visibility: hidden !important; }
-          .print-sheet, .print-sheet * { visibility: visible !important; }
-          .print-sheet { position: absolute; left: 0; top: 0; width: 100%; padding: 0 !important; }
-          .no-print { display: none !important; }
-        }
-      `}</style>
-
-      <div className="rc-fade" style={{ maxWidth: 760, margin: '0 auto' }}>
-        <div className="no-print" style={{ textAlign: 'center', marginBottom: 20 }}>
-          <div style={{ width: 64, height: 64, borderRadius: '50%', background: theme.success + '20', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 14px' }}>
-            <Check size={32} style={{ color: theme.success }} strokeWidth={3} />
-          </div>
-          <h2 style={{ fontSize: '1.6rem', fontWeight: 800, margin: 0, fontFamily: 'Manrope, sans-serif' }}>Reprise validée</h2>
-          <p style={{ color: theme.textMuted, margin: '6px 0 0' }}>Imprimez la fiche pour la remettre au client.</p>
+    <div className="rc-fade" style={{ maxWidth: 760, margin: '0 auto' }}>
+      <div style={{ textAlign: 'center', marginBottom: 20 }}>
+        <div style={{ width: 64, height: 64, borderRadius: '50%', background: theme.success + '20', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 14px' }}>
+          <Check size={32} style={{ color: theme.success }} strokeWidth={3} />
         </div>
+        <h2 style={{ fontSize: '1.6rem', fontWeight: 800, margin: 0, fontFamily: 'Manrope, sans-serif' }}>Reprise validée</h2>
+        <p style={{ color: theme.textMuted, margin: '6px 0 0' }}>Imprimez la fiche pour la remettre au client.</p>
+      </div>
 
-        {/* Boutons d'action — masqués à l'impression */}
-        <div className="no-print" style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 20 }}>
-          <button className="rc-btn" onClick={handlePrint} style={{ flex: 1, minWidth: 200, padding: '14px', borderRadius: 12, border: 'none', background: theme.primary, color: '#fff', fontWeight: 800, fontSize: '1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-            <Printer size={18} /> Imprimer la fiche A4
-          </button>
-          <button className="rc-btn" onClick={onRestart} style={{ flex: 1, minWidth: 200, padding: '14px', borderRadius: 12, border: `1.5px solid ${theme.primary}`, background: '#fff', color: theme.primary, fontWeight: 700, fontSize: '1rem', cursor: 'pointer' }}>
-            Nouvelle estimation
-          </button>
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 20 }}>
+        <button className="rc-btn" onClick={handlePrint} style={{ flex: 1, minWidth: 200, padding: '14px', borderRadius: 12, border: 'none', background: theme.primary, color: '#fff', fontWeight: 800, fontSize: '1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+          <Printer size={18} /> Imprimer la fiche A4
+        </button>
+        <button className="rc-btn" onClick={onRestart} style={{ flex: 1, minWidth: 200, padding: '14px', borderRadius: 12, border: `1.5px solid ${theme.primary}`, background: '#fff', color: theme.primary, fontWeight: 700, fontSize: '1rem', cursor: 'pointer' }}>
+          Nouvelle estimation
+        </button>
+      </div>
+
+      {/* Aperçu écran (ce que contient la fiche imprimée) */}
+      <div style={{ background: '#fff', padding: 28, borderRadius: 16, border: `1px solid ${theme.primary}15`, color: '#000', fontFamily: theme.fontFamily }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: `2px solid ${theme.primary}`, paddingBottom: 14, marginBottom: 18 }}>
+          <div>
+            <div style={{ fontSize: '1.5rem', fontWeight: 800, color: theme.primaryDark, fontFamily: 'Manrope, sans-serif' }}>{theme.siteName || 'Care Reprise'}</div>
+            <div style={{ fontSize: '0.85rem', color: '#555' }}>Offre de rachat de smartphone</div>
+          </div>
+          <div style={{ textAlign: 'right', fontSize: '0.85rem' }}>
+            <div><strong>Date :</strong> {fmt(today)}</div>
+            <div><strong>Valable jusqu'au :</strong> {fmt(validUntil)}</div>
+          </div>
         </div>
-
-        {/* ===== FICHE IMPRIMABLE A4 ===== */}
-        <div className="print-sheet" style={{ background: '#fff', padding: 32, borderRadius: 16, border: `1px solid ${theme.primary}15`, color: '#000', fontFamily: theme.fontFamily }}>
-          {/* En-tête */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: `2px solid ${theme.primary}`, paddingBottom: 14, marginBottom: 20 }}>
-            <div>
-              <div style={{ fontSize: '1.6rem', fontWeight: 800, color: theme.primaryDark, fontFamily: 'Manrope, sans-serif' }}>{theme.siteName || 'Care Reprise'}</div>
-              <div style={{ fontSize: '0.85rem', color: '#555' }}>Offre de rachat de smartphone</div>
-            </div>
-            <div style={{ textAlign: 'right', fontSize: '0.85rem' }}>
-              <div><strong>Date :</strong> {fmt(today)}</div>
-              <div><strong>Valable jusqu'au :</strong> {fmt(validUntil)}</div>
-            </div>
-          </div>
-
-          {/* Client */}
-          <div style={{ marginBottom: 20 }}>
-            <h3 style={{ fontSize: '0.95rem', fontWeight: 800, margin: '0 0 8px', textTransform: 'uppercase', letterSpacing: '0.05em', color: theme.primaryDark }}>Client</h3>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.95rem' }}>
-              <tbody>
-                <tr><td style={{ padding: '6px 0', color: '#555', width: 130 }}>Nom et prénom</td><td style={{ fontWeight: 600 }}>{customer?.firstName} {customer?.lastName}</td></tr>
-                <tr><td style={{ padding: '6px 0', color: '#555' }}>Téléphone</td><td style={{ fontWeight: 600 }}>{customer?.phone}</td></tr>
-                <tr><td style={{ padding: '6px 0', color: '#555' }}>Email</td><td style={{ fontWeight: 600 }}>{customer?.email}</td></tr>
-              </tbody>
-            </table>
-          </div>
-
-          {/* Récapitulatif de l'évaluation */}
-          <div style={{ marginBottom: 20 }}>
-            <h3 style={{ fontSize: '0.95rem', fontWeight: 800, margin: '0 0 8px', textTransform: 'uppercase', letterSpacing: '0.05em', color: theme.primaryDark }}>Récapitulatif de l'évaluation</h3>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.95rem' }}>
-              <tbody>
-                <tr><td style={{ padding: '6px 0', color: '#555', width: 180 }}>Marque</td><td style={{ fontWeight: 600 }}>{brand?.name || ''}</td></tr>
-                <tr><td style={{ padding: '6px 0', color: '#555' }}>Modèle</td><td style={{ fontWeight: 600 }}>{product.name} ({storage})</td></tr>
-                <tr><td style={{ padding: '6px 0', color: '#555' }}>État général</td><td style={{ fontWeight: 600 }}>{condLabels[evaluation.condition]}</td></tr>
-                <tr><td style={{ padding: '6px 0', color: '#555' }}>Batterie</td><td style={{ fontWeight: 600 }}>{battLabels[evaluation.battery]}</td></tr>
-                <tr><td style={{ padding: '6px 0', color: '#555' }}>Caméra</td><td style={{ fontWeight: 600 }}>{battLabels[evaluation.camera]}</td></tr>
-                <tr><td style={{ padding: '6px 0', color: '#555' }}>Facture {'<'} 2 ans</td><td style={{ fontWeight: 600 }}>{evaluation.invoice === 'oui' ? 'Oui' : 'Non'}</td></tr>
-              </tbody>
-            </table>
-          </div>
-
-          {/* Prix de rachat */}
-          <div style={{ padding: 20, background: theme.primaryLight, border: `2px solid ${theme.primary}`, borderRadius: 12, textAlign: 'center', marginBottom: 18 }}>
-            <div style={{ fontSize: '0.85rem', fontWeight: 700, color: theme.primaryDark, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Montant proposé pour la reprise</div>
-            <div style={{ fontSize: '2.6rem', fontWeight: 800, color: theme.primaryDark, fontFamily: 'Manrope, sans-serif', letterSpacing: '-0.02em', lineHeight: 1.1, marginTop: 4 }}>{calc.price} €</div>
-          </div>
-
-          {/* Mention validité */}
-          <div style={{ padding: 12, background: '#fff7ed', border: '1.5px solid #fdba74', borderRadius: 8, fontSize: '0.88rem', textAlign: 'center', marginBottom: 18, color: '#9a3412', fontWeight: 600 }}>
-            ⚠ Cette offre de rachat est valable uniquement <strong>15 jours</strong>, soit jusqu'au <strong>{fmt(validUntil)}</strong>.
-          </div>
-
-          {/* Signature */}
-          <div style={{ display: 'flex', gap: 30, marginTop: 28, fontSize: '0.88rem' }}>
-            <div style={{ flex: 1 }}>
-              <div style={{ color: '#555', marginBottom: 40 }}>Signature du client :</div>
-              <div style={{ borderTop: '1px solid #999' }} />
-            </div>
-            <div style={{ flex: 1 }}>
-              <div style={{ color: '#555', marginBottom: 40 }}>Cachet du magasin :</div>
-              <div style={{ borderTop: '1px solid #999' }} />
-            </div>
-          </div>
+        <div style={{ marginBottom: 18 }}>
+          <h3 style={{ fontSize: '0.95rem', fontWeight: 800, margin: '0 0 8px', textTransform: 'uppercase', letterSpacing: '0.05em', color: theme.primaryDark }}>Client</h3>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.95rem' }}>
+            <tbody>
+              <tr><td style={{ padding: '5px 0', color: '#555', width: 140 }}>Nom et prénom</td><td style={{ fontWeight: 600 }}>{customer?.firstName} {customer?.lastName}</td></tr>
+              <tr><td style={{ padding: '5px 0', color: '#555' }}>Téléphone</td><td style={{ fontWeight: 600 }}>{customer?.phone}</td></tr>
+              <tr><td style={{ padding: '5px 0', color: '#555' }}>Email</td><td style={{ fontWeight: 600 }}>{customer?.email}</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div style={{ marginBottom: 18 }}>
+          <h3 style={{ fontSize: '0.95rem', fontWeight: 800, margin: '0 0 8px', textTransform: 'uppercase', letterSpacing: '0.05em', color: theme.primaryDark }}>Récapitulatif de l'évaluation</h3>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.95rem' }}>
+            <tbody>
+              <tr><td style={{ padding: '5px 0', color: '#555', width: 180 }}>Marque</td><td style={{ fontWeight: 600 }}>{brand?.name || ''}</td></tr>
+              <tr><td style={{ padding: '5px 0', color: '#555' }}>Modèle</td><td style={{ fontWeight: 600 }}>{product.name} ({storage})</td></tr>
+              <tr><td style={{ padding: '5px 0', color: '#555' }}>État général</td><td style={{ fontWeight: 600 }}>{condLabels[evaluation.condition]}</td></tr>
+              <tr><td style={{ padding: '5px 0', color: '#555' }}>Batterie</td><td style={{ fontWeight: 600 }}>{battLabels[evaluation.battery]}</td></tr>
+              <tr><td style={{ padding: '5px 0', color: '#555' }}>Caméra</td><td style={{ fontWeight: 600 }}>{battLabels[evaluation.camera]}</td></tr>
+              <tr><td style={{ padding: '5px 0', color: '#555' }}>Facture {'<'} 2 ans</td><td style={{ fontWeight: 600 }}>{evaluation.invoice === 'oui' ? 'Oui' : 'Non'}</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div style={{ padding: 18, background: theme.primaryLight, border: `2px solid ${theme.primary}`, borderRadius: 12, textAlign: 'center', marginBottom: 14 }}>
+          <div style={{ fontSize: '0.85rem', fontWeight: 700, color: theme.primaryDark, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Montant proposé pour la reprise</div>
+          <div style={{ fontSize: '2.4rem', fontWeight: 800, color: theme.primaryDark, fontFamily: 'Manrope, sans-serif', letterSpacing: '-0.02em', lineHeight: 1.1, marginTop: 4 }}>{calc.price} €</div>
+        </div>
+        <div style={{ padding: 12, background: '#fff7ed', border: '1.5px solid #fdba74', borderRadius: 8, fontSize: '0.88rem', textAlign: 'center', color: '#9a3412', fontWeight: 600 }}>
+          ⚠ Cette offre de rachat est valable uniquement <strong>15 jours</strong>, soit jusqu'au <strong>{fmt(validUntil)}</strong>.
         </div>
       </div>
-    </>
+    </div>
   );
 }
 
@@ -1348,8 +1396,8 @@ function HistoryLogin({ theme, onUnlock }) {
   );
 }
 
-// ================== HISTORY VIEW (liste des estimations + recherche) ==================
-function HistoryView({ theme, history, setHistory, onLock }) {
+// ================== HISTORY VIEW (liste des estimations + recherche + réimpression) ==================
+function HistoryView({ theme, history, setHistory, products, brands, onLock }) {
   const [q, setQ] = useState('');
   const query = q.trim().toLowerCase();
 
@@ -1368,6 +1416,22 @@ function HistoryView({ theme, history, setHistory, onLock }) {
   const fmtDate = (iso) => { try { const d = new Date(iso); return d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' }) + ' à ' + d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }); } catch (e) { return iso; } };
 
   const deleteEntry = (id) => { if (window.confirm('Supprimer cette estimation de l\'historique ?')) setHistory(history.filter(e => e.id !== id)); };
+
+  // Réimprimer une fiche depuis l'historique : reconstitue les données et ouvre la fenêtre d'impression
+  const reprint = (e) => {
+    const prod = (products || []).find(p => p.id === e.product?.id) || { name: e.product?.name };
+    const br = (brands || []).find(b => b.id === e.product?.brand) || { name: e.product?.brand };
+    printInvoiceSheet({
+      theme,
+      product: prod,
+      brand: br,
+      storage: e.storage,
+      calc: e.calc,
+      evaluation: e.evaluation,
+      customer: e.customer,
+      date: e.date, // la fiche garde la date d'origine + validité de 15j à partir de là
+    });
+  };
 
   return (
     <div className="rc-fade">
@@ -1417,7 +1481,10 @@ function HistoryView({ theme, history, setHistory, onLock }) {
                   {c.phone && <span style={{ color: theme.textMuted }}><Phone size={11} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 3 }} />{c.phone}</span>}
                   {c.email && <span style={{ color: theme.textMuted }}><Mail size={11} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 3 }} />{c.email}</span>}
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+                  <button className="rc-btn" onClick={() => reprint(e)} title="Réimprimer" style={{ padding: '6px 12px', borderRadius: 8, border: `1.5px solid ${theme.primary}30`, background: '#fff', color: theme.primary, cursor: 'pointer', fontSize: '0.82rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 5 }}>
+                    <Printer size={13} /> Réimprimer
+                  </button>
                   <button className="rc-btn" onClick={() => deleteEntry(e.id)} title="Supprimer" style={{ padding: '4px 8px', borderRadius: 8, border: 'none', background: 'transparent', color: '#dc2626', cursor: 'pointer', fontSize: '0.78rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
                     <Trash2 size={13} /> Supprimer
                   </button>
