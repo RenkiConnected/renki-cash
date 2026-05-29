@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Search, Home, LayoutDashboard, Smartphone, Battery, Camera, FileText, ChevronRight, ChevronUp, ChevronDown, Plus, Edit2, Trash2, Save, X, Palette, Type, Settings, Check, ArrowLeft, Upload, Sparkles, Lock, ExternalLink } from 'lucide-react';
+import { Search, Home, LayoutDashboard, Smartphone, Battery, Camera, FileText, ChevronRight, ChevronUp, ChevronDown, Plus, Edit2, Trash2, Save, X, Palette, Type, Settings, Check, ArrowLeft, Upload, Sparkles, Lock, ExternalLink, Printer, User, Phone, Mail, History } from 'lucide-react';
 import { loadConfig, saveKey, subscribeConfig, firebaseReady } from './storage';
 
 // Mot de passe d'accès au tableau de bord
 const DASHBOARD_PASSWORD = 'Raphael2232';
+// Mot de passe d'accès à l'historique des estimations
+const HISTORY_PASSWORD = '0852';
 
 // ================== BASE DE DONNÉES INITIALE ==================
 // Prix indicatifs basés sur les grilles publiques Back Market, Recommerce, Easy Cash (mai 2026)
@@ -478,6 +480,9 @@ export default function RenkiCash() {
   const [finalCalc, setFinalCalc] = useState(null);
   const [competitorPrice, setCompetitorPrice] = useState(''); // prix de vente concurrent saisi manuellement
   const [dashboardUnlocked, setDashboardUnlocked] = useState(false); // accès dashboard déverrouillé ?
+  const [historyUnlocked, setHistoryUnlocked] = useState(false); // accès historique déverrouillé ?
+  const [history, setHistory] = useState([]); // historique des estimations validées
+  const [customer, setCustomer] = useState({ firstName: '', lastName: '', phone: '', email: '' }); // infos client en cours
   const hydrated = useRef(false); // évite de ré-sauvegarder pendant le chargement initial
 
   // Applique un objet de config (venant de Firebase ou du local) sur les états
@@ -487,6 +492,7 @@ export default function RenkiCash() {
     if (cfg.products) setProducts(cfg.products);
     if (cfg.brands) setBrands(cfg.brands);
     if (cfg.pricing) setPricing(cfg.pricing);
+    if (cfg.history) setHistory(cfg.history);
   };
 
   // Chargement initial + écoute temps réel (si Firebase configuré)
@@ -507,6 +513,7 @@ export default function RenkiCash() {
   useEffect(() => { if (hydrated.current) saveKey('products', products); }, [products]);
   useEffect(() => { if (hydrated.current) saveKey('brands', brands); }, [brands]);
   useEffect(() => { if (hydrated.current) saveKey('pricing', pricing); }, [pricing]);
+  useEffect(() => { if (hydrated.current) saveKey('history', history); }, [history]);
 
   const evaluationComplete = evaluation.condition && evaluation.battery && evaluation.camera && evaluation.invoice;
 
@@ -533,6 +540,7 @@ export default function RenkiCash() {
     setFinalCalc(null);
     setSearchQuery('');
     setCompetitorPrice('');
+    setCustomer({ firstName: '', lastName: '', phone: '', email: '' });
   };
 
   // Styles inline pour theming dynamique
@@ -596,11 +604,29 @@ export default function RenkiCash() {
       <main style={{ maxWidth: 1280, margin: '0 auto', padding: '24px 16px 80px' }}>
         {view === 'home' && <HomeView theme={theme} brands={brands} products={products} onSelectBrand={(b) => { setSelectedBrand(b); setView('brand'); }} searchQuery={searchQuery} filteredProducts={filteredProducts} onSelectProduct={(p) => { setSelectedBrand(brands.find(b => b.id === p.brand)); setSelectedProduct(p); setView('product'); }} />}
         {view === 'brand' && selectedBrand && <BrandView theme={theme} brand={selectedBrand} products={products.filter(p => p.brand === selectedBrand.id)} onSelectProduct={(p) => { setSelectedProduct(p); setView('product'); }} />}
-        {view === 'product' && selectedProduct && <ProductView theme={theme} product={selectedProduct} brand={brands.find(b => b.id === selectedProduct.brand)} selectedStorage={selectedStorage} setSelectedStorage={setSelectedStorage} competitorPrice={competitorPrice} setCompetitorPrice={setCompetitorPrice} evaluation={evaluation} setEvaluation={setEvaluation} pricing={pricing} evaluationComplete={evaluationComplete} currentCalc={currentCalc} onValidate={() => { setFinalCalc(currentCalc); setView('result'); }} onBack={() => setView('brand')} />}
-        {view === 'result' && finalCalc && <ResultView theme={theme} product={selectedProduct} storage={selectedStorage} calc={finalCalc} evaluation={evaluation} onRestart={goHome} />}
+        {view === 'product' && selectedProduct && <ProductView theme={theme} product={selectedProduct} brand={brands.find(b => b.id === selectedProduct.brand)} selectedStorage={selectedStorage} setSelectedStorage={setSelectedStorage} competitorPrice={competitorPrice} setCompetitorPrice={setCompetitorPrice} evaluation={evaluation} setEvaluation={setEvaluation} pricing={pricing} evaluationComplete={evaluationComplete} currentCalc={currentCalc} onValidate={() => { setFinalCalc(currentCalc); setView('customer'); }} onBack={() => setView('brand')} />}
+        {view === 'customer' && finalCalc && <CustomerView theme={theme} customer={customer} setCustomer={setCustomer} onBack={() => setView('product')} onConfirm={() => {
+          // Enregistrer dans l'historique
+          const entry = {
+            id: 'est-' + Date.now(),
+            date: new Date().toISOString(),
+            customer: { ...customer },
+            product: { id: selectedProduct.id, name: selectedProduct.name, brand: selectedProduct.brand },
+            storage: selectedStorage,
+            evaluation: { ...evaluation },
+            calc: { price: finalCalc.price, breakdown: finalCalc.breakdown, resaleMin: finalCalc.resaleMin, resaleMax: finalCalc.resaleMax },
+          };
+          setHistory([entry, ...history]);
+          setView('result');
+        }} />}
+        {view === 'result' && finalCalc && <ResultView theme={theme} product={selectedProduct} storage={selectedStorage} calc={finalCalc} evaluation={evaluation} customer={customer} brand={brands.find(b => b.id === selectedProduct.brand)} theme0={theme} onRestart={goHome} />}
         {view === 'dashboard' && (dashboardUnlocked
           ? <Dashboard theme={theme} setTheme={setTheme} brands={brands} setBrands={setBrands} products={products} setProducts={setProducts} pricing={pricing} setPricing={setPricing} onLock={() => setDashboardUnlocked(false)} />
           : <DashboardLogin theme={theme} onUnlock={() => setDashboardUnlocked(true)} />
+        )}
+        {view === 'history' && (historyUnlocked
+          ? <HistoryView theme={theme} history={history} setHistory={setHistory} onLock={() => setHistoryUnlocked(false)} />
+          : <HistoryLogin theme={theme} onUnlock={() => setHistoryUnlocked(true)} />
         )}
       </main>
       <Footer theme={theme} />
@@ -657,6 +683,7 @@ function Header({ theme, view, setView, goHome, searchQuery, setSearchQuery }) {
 
         <nav style={{ display: 'flex', gap: 8, marginLeft: 'auto' }}>
           <NavBtn theme={theme} active={view === 'home'} onClick={goHome} icon={<Home size={18} />} label="Accueil" />
+          <NavBtn theme={theme} active={view === 'history'} onClick={() => setView('history')} icon={<History size={18} />} label="Historique" />
           <NavBtn theme={theme} active={view === 'dashboard'} onClick={() => setView('dashboard')} icon={<LayoutDashboard size={18} />} label="Dashboard" />
         </nav>
       </div>
@@ -1102,73 +1129,180 @@ function CriteriaBtn({ theme, selected, onClick, label, desc }) {
   );
 }
 
-// ================== RESULT VIEW ==================
-function ResultView({ theme, product, storage, calc, evaluation, onRestart }) {
+// ================== CUSTOMER VIEW (saisie infos client avant validation) ==================
+function CustomerView({ theme, customer, setCustomer, onBack, onConfirm }) {
+  const [errors, setErrors] = useState({});
+  const upd = (k, v) => { setCustomer({ ...customer, [k]: v }); setErrors({ ...errors, [k]: false }); };
+
+  const submit = () => {
+    const errs = {};
+    if (!customer.firstName.trim()) errs.firstName = true;
+    if (!customer.lastName.trim()) errs.lastName = true;
+    if (!customer.phone.trim()) errs.phone = true;
+    if (!customer.email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customer.email)) errs.email = true;
+    if (Object.keys(errs).length > 0) { setErrors(errs); return; }
+    onConfirm();
+  };
+
+  const inputS = (err) => ({
+    width: '100%', padding: '12px 14px', borderRadius: 10,
+    border: `1.5px solid ${err ? '#dc2626' : theme.primary + '25'}`,
+    background: '#fff', fontSize: '1rem', color: theme.text,
+  });
+
+  return (
+    <div className="rc-fade" style={{ maxWidth: 560, margin: '0 auto' }}>
+      <button className="rc-btn" onClick={onBack} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 12px', borderRadius: 10, border: 'none', background: 'transparent', color: theme.textMuted, cursor: 'pointer', fontWeight: 600, fontSize: '0.9rem', marginBottom: 16 }}>
+        <ArrowLeft size={16} /> Retour
+      </button>
+
+      <div style={{ textAlign: 'center', marginBottom: 24 }}>
+        <div style={{ width: 56, height: 56, borderRadius: '50%', background: theme.primaryLight, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 14px' }}>
+          <User size={26} style={{ color: theme.primary }} />
+        </div>
+        <h2 style={{ fontSize: '1.4rem', fontWeight: 800, margin: 0, fontFamily: 'Manrope, sans-serif' }}>Coordonnées du client</h2>
+        <p style={{ color: theme.textMuted, margin: '6px 0 0', fontSize: '0.9rem' }}>Tous les champs sont obligatoires pour finaliser l'offre de rachat.</p>
+      </div>
+
+      <div style={{ padding: 20, borderRadius: 16, background: '#fff', border: `1px solid ${theme.primary}15`, display: 'grid', gap: 14 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14 }}>
+          <div>
+            <label style={{ fontSize: '0.85rem', fontWeight: 700, display: 'block', marginBottom: 6 }}>Prénom *</label>
+            <input value={customer.firstName} onChange={(e) => upd('firstName', e.target.value)} className="rc-input" style={inputS(errors.firstName)} />
+          </div>
+          <div>
+            <label style={{ fontSize: '0.85rem', fontWeight: 700, display: 'block', marginBottom: 6 }}>Nom *</label>
+            <input value={customer.lastName} onChange={(e) => upd('lastName', e.target.value)} className="rc-input" style={inputS(errors.lastName)} />
+          </div>
+        </div>
+        <div>
+          <label style={{ fontSize: '0.85rem', fontWeight: 700, display: 'block', marginBottom: 6 }}><Phone size={13} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 4 }} /> Téléphone *</label>
+          <input value={customer.phone} onChange={(e) => upd('phone', e.target.value)} placeholder="06 12 34 56 78" className="rc-input" style={inputS(errors.phone)} />
+        </div>
+        <div>
+          <label style={{ fontSize: '0.85rem', fontWeight: 700, display: 'block', marginBottom: 6 }}><Mail size={13} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 4 }} /> Email *</label>
+          <input value={customer.email} onChange={(e) => upd('email', e.target.value)} type="email" placeholder="client@exemple.fr" className="rc-input" style={inputS(errors.email)} />
+        </div>
+        {Object.keys(errors).length > 0 && (
+          <p style={{ color: '#dc2626', fontSize: '0.85rem', margin: 0, fontWeight: 600 }}>Merci de remplir correctement tous les champs.</p>
+        )}
+        <button className="rc-btn" onClick={submit} style={{ padding: '14px', borderRadius: 12, border: 'none', background: theme.primary, color: '#fff', fontWeight: 800, fontSize: '1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 4 }}>
+          Confirmer et générer la fiche <ChevronRight size={18} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ================== RESULT VIEW (avec fiche imprimable A4) ==================
+function ResultView({ theme, product, storage, calc, evaluation, customer, brand, onRestart }) {
   const condLabels = { 'neuf': 'Neuf', 'comme-neuf': 'Comme neuf', 'bon': 'Bon état', 'moyen': 'État moyen', 'mauvais': 'Mauvais', 'tres-mauvais': 'Très mauvais' };
   const battLabels = { 'fonctionnelle': 'Fonctionnelle', 'a-remplacer': 'À remplacer', 'non-fonctionnelle': 'Non fonctionnelle' };
 
+  const today = new Date();
+  const validUntil = new Date(today.getTime() + 15 * 24 * 3600 * 1000);
+  const fmt = (d) => d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+
+  const handlePrint = () => window.print();
+
   return (
-    <div className="rc-fade" style={{ maxWidth: 760, margin: '0 auto' }}>
-      <div style={{ textAlign: 'center', marginBottom: 28 }}>
-        <div style={{ width: 64, height: 64, borderRadius: '50%', background: theme.success + '20', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
-          <Check size={32} style={{ color: theme.success }} strokeWidth={3} />
-        </div>
-        <h2 style={{ fontSize: '1.6rem', fontWeight: 800, margin: 0, fontFamily: 'Manrope, sans-serif' }}>Estimation validée</h2>
-        <p style={{ color: theme.textMuted, margin: '6px 0 0' }}>Voici le prix de rachat pour votre appareil</p>
-      </div>
+    <>
+      {/* Styles d'impression — masque tout sauf .print-sheet et formate en A4 */}
+      <style>{`
+        @media print {
+          @page { size: A4; margin: 18mm; }
+          body * { visibility: hidden !important; }
+          .print-sheet, .print-sheet * { visibility: visible !important; }
+          .print-sheet { position: absolute; left: 0; top: 0; width: 100%; padding: 0 !important; }
+          .no-print { display: none !important; }
+        }
+      `}</style>
 
-      <div className="rc-price-display rc-pop" style={{ padding: 32, borderRadius: 24, color: '#fff', textAlign: 'center', marginBottom: 20, boxShadow: `0 16px 40px ${theme.primary}50` }}>
-        <div style={{ fontSize: '0.9rem', opacity: 0.9, marginBottom: 6, fontWeight: 600 }}>Prix de rachat final</div>
-        <div style={{ fontSize: '3.6rem', fontWeight: 800, fontFamily: 'Manrope, sans-serif', letterSpacing: '-0.03em', lineHeight: 1 }}>{calc.price} €</div>
-        <div style={{ fontSize: '0.95rem', opacity: 0.9, marginTop: 8 }}>{product.name} · {storage}</div>
-        <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid rgba(255,255,255,0.25)', fontSize: '0.95rem' }}>
-          Revente conseillée : <strong style={{ fontFamily: 'Manrope, sans-serif', fontSize: '1.15rem' }}>{calc.resaleMin} € – {calc.resaleMax} €</strong>
+      <div className="rc-fade" style={{ maxWidth: 760, margin: '0 auto' }}>
+        <div className="no-print" style={{ textAlign: 'center', marginBottom: 20 }}>
+          <div style={{ width: 64, height: 64, borderRadius: '50%', background: theme.success + '20', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 14px' }}>
+            <Check size={32} style={{ color: theme.success }} strokeWidth={3} />
+          </div>
+          <h2 style={{ fontSize: '1.6rem', fontWeight: 800, margin: 0, fontFamily: 'Manrope, sans-serif' }}>Reprise validée</h2>
+          <p style={{ color: theme.textMuted, margin: '6px 0 0' }}>Imprimez la fiche pour la remettre au client.</p>
         </div>
-      </div>
 
-      {/* Détail du calcul */}
-      <div style={{ padding: 20, borderRadius: 16, background: '#fff', border: `1px solid ${theme.primary}15`, marginBottom: 20 }}>
-        <h3 style={{ fontSize: '1rem', fontWeight: 700, margin: '0 0 12px', fontFamily: 'Manrope, sans-serif' }}>Détail du calcul</h3>
-        {calc.breakdown.map((line, i) => {
-          const isFinal = line.type === 'final';
-          const isBase = line.type === 'base';
-          const isBonus = line.type === 'bonus';
-          return (
-            <div key={i} style={{
-              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-              padding: '10px 0',
-              borderTop: isFinal ? `2px solid ${theme.primary}` : i > 0 ? '1px solid #f1f5f9' : 'none',
-              marginTop: isFinal ? 8 : 0, paddingTop: isFinal ? 14 : 10,
-              fontWeight: isFinal || isBase ? 700 : 500,
-              fontSize: isFinal ? '1.05rem' : '0.9rem',
-              color: isFinal ? theme.primaryDark : line.value < 0 ? '#dc2626' : isBonus ? theme.success : theme.text,
-            }}>
-              <span>{line.label}</span>
-              <span style={{ fontFamily: 'Manrope, sans-serif', fontWeight: 700 }}>
-                {line.value > 0 && !isFinal && !isBase ? '+' : ''}{line.value} €
-              </span>
+        {/* Boutons d'action — masqués à l'impression */}
+        <div className="no-print" style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 20 }}>
+          <button className="rc-btn" onClick={handlePrint} style={{ flex: 1, minWidth: 200, padding: '14px', borderRadius: 12, border: 'none', background: theme.primary, color: '#fff', fontWeight: 800, fontSize: '1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+            <Printer size={18} /> Imprimer la fiche A4
+          </button>
+          <button className="rc-btn" onClick={onRestart} style={{ flex: 1, minWidth: 200, padding: '14px', borderRadius: 12, border: `1.5px solid ${theme.primary}`, background: '#fff', color: theme.primary, fontWeight: 700, fontSize: '1rem', cursor: 'pointer' }}>
+            Nouvelle estimation
+          </button>
+        </div>
+
+        {/* ===== FICHE IMPRIMABLE A4 ===== */}
+        <div className="print-sheet" style={{ background: '#fff', padding: 32, borderRadius: 16, border: `1px solid ${theme.primary}15`, color: '#000', fontFamily: theme.fontFamily }}>
+          {/* En-tête */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: `2px solid ${theme.primary}`, paddingBottom: 14, marginBottom: 20 }}>
+            <div>
+              <div style={{ fontSize: '1.6rem', fontWeight: 800, color: theme.primaryDark, fontFamily: 'Manrope, sans-serif' }}>{theme.siteName || 'Care Reprise'}</div>
+              <div style={{ fontSize: '0.85rem', color: '#555' }}>Offre de rachat de smartphone</div>
             </div>
-          );
-        })}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0 0', fontSize: '0.9rem', fontWeight: 600, color: theme.textMuted }}>
-          <span>Prix de revente conseillé</span>
-          <span style={{ fontFamily: 'Manrope, sans-serif', fontWeight: 700, color: theme.text }}>{calc.resaleMin} € – {calc.resaleMax} €</span>
+            <div style={{ textAlign: 'right', fontSize: '0.85rem' }}>
+              <div><strong>Date :</strong> {fmt(today)}</div>
+              <div><strong>Valable jusqu'au :</strong> {fmt(validUntil)}</div>
+            </div>
+          </div>
+
+          {/* Client */}
+          <div style={{ marginBottom: 20 }}>
+            <h3 style={{ fontSize: '0.95rem', fontWeight: 800, margin: '0 0 8px', textTransform: 'uppercase', letterSpacing: '0.05em', color: theme.primaryDark }}>Client</h3>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.95rem' }}>
+              <tbody>
+                <tr><td style={{ padding: '6px 0', color: '#555', width: 130 }}>Nom et prénom</td><td style={{ fontWeight: 600 }}>{customer?.firstName} {customer?.lastName}</td></tr>
+                <tr><td style={{ padding: '6px 0', color: '#555' }}>Téléphone</td><td style={{ fontWeight: 600 }}>{customer?.phone}</td></tr>
+                <tr><td style={{ padding: '6px 0', color: '#555' }}>Email</td><td style={{ fontWeight: 600 }}>{customer?.email}</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          {/* Récapitulatif de l'évaluation */}
+          <div style={{ marginBottom: 20 }}>
+            <h3 style={{ fontSize: '0.95rem', fontWeight: 800, margin: '0 0 8px', textTransform: 'uppercase', letterSpacing: '0.05em', color: theme.primaryDark }}>Récapitulatif de l'évaluation</h3>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.95rem' }}>
+              <tbody>
+                <tr><td style={{ padding: '6px 0', color: '#555', width: 180 }}>Marque</td><td style={{ fontWeight: 600 }}>{brand?.name || ''}</td></tr>
+                <tr><td style={{ padding: '6px 0', color: '#555' }}>Modèle</td><td style={{ fontWeight: 600 }}>{product.name} ({storage})</td></tr>
+                <tr><td style={{ padding: '6px 0', color: '#555' }}>État général</td><td style={{ fontWeight: 600 }}>{condLabels[evaluation.condition]}</td></tr>
+                <tr><td style={{ padding: '6px 0', color: '#555' }}>Batterie</td><td style={{ fontWeight: 600 }}>{battLabels[evaluation.battery]}</td></tr>
+                <tr><td style={{ padding: '6px 0', color: '#555' }}>Caméra</td><td style={{ fontWeight: 600 }}>{battLabels[evaluation.camera]}</td></tr>
+                <tr><td style={{ padding: '6px 0', color: '#555' }}>Facture {'<'} 2 ans</td><td style={{ fontWeight: 600 }}>{evaluation.invoice === 'oui' ? 'Oui' : 'Non'}</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          {/* Prix de rachat */}
+          <div style={{ padding: 20, background: theme.primaryLight, border: `2px solid ${theme.primary}`, borderRadius: 12, textAlign: 'center', marginBottom: 18 }}>
+            <div style={{ fontSize: '0.85rem', fontWeight: 700, color: theme.primaryDark, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Montant proposé pour la reprise</div>
+            <div style={{ fontSize: '2.6rem', fontWeight: 800, color: theme.primaryDark, fontFamily: 'Manrope, sans-serif', letterSpacing: '-0.02em', lineHeight: 1.1, marginTop: 4 }}>{calc.price} €</div>
+          </div>
+
+          {/* Mention validité */}
+          <div style={{ padding: 12, background: '#fff7ed', border: '1.5px solid #fdba74', borderRadius: 8, fontSize: '0.88rem', textAlign: 'center', marginBottom: 18, color: '#9a3412', fontWeight: 600 }}>
+            ⚠ Cette offre de rachat est valable uniquement <strong>15 jours</strong>, soit jusqu'au <strong>{fmt(validUntil)}</strong>.
+          </div>
+
+          {/* Signature */}
+          <div style={{ display: 'flex', gap: 30, marginTop: 28, fontSize: '0.88rem' }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ color: '#555', marginBottom: 40 }}>Signature du client :</div>
+              <div style={{ borderTop: '1px solid #999' }} />
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ color: '#555', marginBottom: 40 }}>Cachet du magasin :</div>
+              <div style={{ borderTop: '1px solid #999' }} />
+            </div>
+          </div>
         </div>
       </div>
-
-      <div style={{ padding: 20, borderRadius: 16, background: theme.surface, border: `1px solid ${theme.primary}15`, marginBottom: 20 }}>
-        <h3 style={{ fontSize: '1rem', fontWeight: 700, margin: '0 0 12px', fontFamily: 'Manrope, sans-serif' }}>Récapitulatif de l'évaluation</h3>
-        <Row label="Modèle" value={`${product.name} (${storage})`} />
-        <Row label="État" value={condLabels[evaluation.condition]} />
-        <Row label="Batterie" value={battLabels[evaluation.battery]} />
-        <Row label="Caméra" value={battLabels[evaluation.camera]} />
-        <Row label="Facture < 2 ans" value={evaluation.invoice === 'oui' ? 'Oui (+5%)' : 'Non'} last />
-      </div>
-
-      <button className="rc-btn" onClick={onRestart} style={{ width: '100%', padding: '14px', borderRadius: 12, border: `1.5px solid ${theme.primary}`, background: '#fff', color: theme.primary, fontWeight: 700, fontSize: '1rem', cursor: 'pointer' }}>
-        Nouvelle estimation
-      </button>
-    </div>
+    </>
   );
 }
 
@@ -1177,6 +1311,122 @@ function Row({ label, value, last }) {
     <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: last ? 'none' : '1px solid #e5e7eb', fontSize: '0.92rem' }}>
       <span style={{ color: '#64748B' }}>{label}</span>
       <span style={{ fontWeight: 600 }}>{value}</span>
+    </div>
+  );
+}
+
+// ================== HISTORY LOGIN (code séparé 0852) ==================
+function HistoryLogin({ theme, onUnlock }) {
+  const [pwd, setPwd] = useState('');
+  const [error, setError] = useState(false);
+  const tryUnlock = () => {
+    if (pwd === HISTORY_PASSWORD) { setError(false); onUnlock(); }
+    else { setError(true); }
+  };
+  return (
+    <div className="rc-fade" style={{ maxWidth: 420, margin: '40px auto', padding: 28, borderRadius: 20, background: '#fff', border: `1px solid ${theme.primary}15`, boxShadow: '0 4px 16px rgba(0,0,0,0.06)', textAlign: 'center' }}>
+      <div style={{ width: 56, height: 56, borderRadius: '50%', background: theme.primaryLight, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+        <History size={26} style={{ color: theme.primary }} />
+      </div>
+      <h2 style={{ fontSize: '1.3rem', fontWeight: 800, margin: '0 0 6px', fontFamily: 'Manrope, sans-serif' }}>Historique des estimations</h2>
+      <p style={{ color: theme.textMuted, fontSize: '0.9rem', margin: '0 0 20px' }}>Entrez le code d'accès à l'historique.</p>
+      <input
+        type="password"
+        value={pwd}
+        onChange={(e) => { setPwd(e.target.value); setError(false); }}
+        onKeyDown={(e) => { if (e.key === 'Enter') tryUnlock(); }}
+        placeholder="Code"
+        autoFocus
+        className="rc-input"
+        style={{ width: '100%', padding: '12px 14px', borderRadius: 10, border: `1.5px solid ${error ? '#dc2626' : theme.primary + '30'}`, background: theme.surface, fontSize: '1rem', color: theme.text, marginBottom: 12, textAlign: 'center' }}
+      />
+      {error && <p style={{ color: '#dc2626', fontSize: '0.85rem', margin: '0 0 12px', fontWeight: 600 }}>Code incorrect</p>}
+      <button className="rc-btn" onClick={tryUnlock} style={{ width: '100%', padding: '12px', borderRadius: 10, border: 'none', background: theme.primary, color: '#fff', fontWeight: 700, fontSize: '1rem', cursor: 'pointer' }}>
+        Déverrouiller
+      </button>
+    </div>
+  );
+}
+
+// ================== HISTORY VIEW (liste des estimations + recherche) ==================
+function HistoryView({ theme, history, setHistory, onLock }) {
+  const [q, setQ] = useState('');
+  const query = q.trim().toLowerCase();
+
+  // Tri par date desc (plus récent en haut)
+  const sorted = [...history].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+
+  // Filtre par nom/prénom/téléphone/mail/modèle
+  const filtered = sorted.filter(e => {
+    if (!query) return true;
+    const c = e.customer || {};
+    const hay = [c.firstName, c.lastName, c.phone, c.email, e.product?.name].filter(Boolean).join(' ').toLowerCase();
+    return hay.includes(query);
+  });
+
+  const condLabels = { 'neuf': 'Neuf', 'comme-neuf': 'Comme neuf', 'bon': 'Bon état', 'moyen': 'Moyen', 'mauvais': 'Mauvais', 'tres-mauvais': 'Très mauvais' };
+  const fmtDate = (iso) => { try { const d = new Date(iso); return d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' }) + ' à ' + d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }); } catch (e) { return iso; } };
+
+  const deleteEntry = (id) => { if (window.confirm('Supprimer cette estimation de l\'historique ?')) setHistory(history.filter(e => e.id !== id)); };
+
+  return (
+    <div className="rc-fade">
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 18, flexWrap: 'wrap' }}>
+        <History size={26} style={{ color: theme.primary }} />
+        <h2 style={{ fontSize: '1.6rem', fontWeight: 800, margin: 0, fontFamily: 'Manrope, sans-serif' }}>Historique des estimations</h2>
+        <span style={{ marginLeft: 'auto', fontSize: '0.85rem', color: theme.textMuted, fontWeight: 600 }}>{history.length} estimation{history.length > 1 ? 's' : ''}</span>
+        <button className="rc-btn" onClick={onLock} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 10, border: `1.5px solid ${theme.primary}25`, background: '#fff', color: theme.textMuted, fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer' }}>
+          <Lock size={15} /> Verrouiller
+        </button>
+      </div>
+
+      <div style={{ marginBottom: 16, position: 'relative' }}>
+        <Search size={16} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: theme.textMuted }} />
+        <input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Rechercher par nom, prénom, téléphone, email ou modèle..."
+          className="rc-input"
+          style={{ width: '100%', padding: '12px 14px 12px 38px', borderRadius: 10, border: `1.5px solid ${theme.primary}25`, background: '#fff', fontSize: '0.95rem', color: theme.text }}
+        />
+      </div>
+
+      {filtered.length === 0 ? (
+        <div style={{ padding: 40, textAlign: 'center', color: theme.textMuted, background: '#fff', borderRadius: 12, border: `1px dashed ${theme.primary}20` }}>
+          {history.length === 0 ? 'Aucune estimation enregistrée pour le moment.' : 'Aucun résultat pour votre recherche.'}
+        </div>
+      ) : (
+        <div style={{ display: 'grid', gap: 10 }}>
+          {filtered.map((e) => {
+            const c = e.customer || {};
+            return (
+              <div key={e.id} style={{ padding: 14, borderRadius: 12, background: '#fff', border: `1px solid ${theme.primary}15`, display: 'grid', gap: 6 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
+                  <div>
+                    <div style={{ fontSize: '1rem', fontWeight: 800, fontFamily: 'Manrope, sans-serif' }}>{c.firstName} {c.lastName}</div>
+                    <div style={{ fontSize: '0.82rem', color: theme.textMuted }}>{fmtDate(e.date)}</div>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: '1.4rem', fontWeight: 800, color: theme.primaryDark, fontFamily: 'Manrope, sans-serif', lineHeight: 1 }}>{e.calc?.price} €</div>
+                    <div style={{ fontSize: '0.78rem', color: theme.textMuted, marginTop: 2 }}>prix de rachat</div>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, fontSize: '0.85rem', color: theme.text, paddingTop: 6, borderTop: '1px solid #f1f5f9' }}>
+                  <span><strong>{e.product?.name}</strong> ({e.storage})</span>
+                  <span style={{ color: theme.textMuted }}>État : {condLabels[e.evaluation?.condition] || '—'}</span>
+                  {c.phone && <span style={{ color: theme.textMuted }}><Phone size={11} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 3 }} />{c.phone}</span>}
+                  {c.email && <span style={{ color: theme.textMuted }}><Mail size={11} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 3 }} />{c.email}</span>}
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                  <button className="rc-btn" onClick={() => deleteEntry(e.id)} title="Supprimer" style={{ padding: '4px 8px', borderRadius: 8, border: 'none', background: 'transparent', color: '#dc2626', cursor: 'pointer', fontSize: '0.78rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <Trash2 size={13} /> Supprimer
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
