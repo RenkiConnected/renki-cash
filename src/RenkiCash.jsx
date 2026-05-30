@@ -420,6 +420,7 @@ const DEFAULT_THEME = {
   fontFamily: "'Inter', 'Segoe UI', system-ui, sans-serif",
   siteName: 'Renki Cash',
   logoUrl: '',
+  printLogoUrl: '',  // logo de la fiche imprimable / PDF (vide = logo Care par défaut)
   fontSize: 16,
   dashboardPassword: 'Raphael2232',  // modifiable dans le dashboard, onglet Réglages
 };
@@ -1204,10 +1205,11 @@ function CustomerView({ theme, customer, setCustomer, onBack, onConfirm }) {
   );
 }
 
-// ================== IMPRESSION DE LA FICHE A4 (fenêtre dédiée) ==================
-// Ouvre une nouvelle fenêtre avec la fiche A4 finalisée et un bouton Imprimer dedans.
-// L'utilisateur clique sur le bouton → impression. Plus fiable que window.print() auto
-// (qui posait souvent souci sur Windows / Chrome avec aperçu vide).
+// ================== FICHE A4 : Impression + Téléchargement PDF (fenêtre dédiée) ==================
+// Ouvre une nouvelle fenêtre avec la fiche A4 finalisée. L'utilisateur a 2 choix :
+//   • Bouton "Imprimer" → window.print() (avec petit délai pour fiabilité)
+//   • Bouton "Télécharger PDF" → html2pdf.js chargé depuis CDN, génère et télécharge le PDF
+// Le téléchargement PDF est la solution la plus fiable sur Windows Chrome.
 function printInvoiceSheet({ theme, product, brand, storage, calc, evaluation, customer, date, pricing }) {
   const conds = getConditions(pricing);
   const condMap = Object.fromEntries(conds.map(c => [c.key, c.label]));
@@ -1215,30 +1217,33 @@ function printInvoiceSheet({ theme, product, brand, storage, calc, evaluation, c
   const ref = date ? new Date(date) : new Date();
   const validUntil = new Date(ref.getTime() + 15 * 24 * 3600 * 1000);
   const fmt = (d) => d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
-  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+  const esc = (s) => String(s ?? '').replace(/[&<>"\']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
   const primary = theme?.primary || '#00B8D4';
   const primaryDark = theme?.primaryDark || '#007a8c';
   const primaryLight = theme?.primaryLight || '#e0f7fa';
+  const logoSrc = theme?.printLogoUrl && theme.printLogoUrl.trim() ? theme.printLogoUrl.trim() : LOGO_DATA_URL;
+  const cleanName = (customer?.lastName + '_' + customer?.firstName).replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 40) || 'client';
+  const filename = `fiche-reprise_${cleanName}_${fmt(ref).replace(/\//g, '-')}.pdf`;
 
   const html = `<!doctype html>
 <html lang="fr"><head><meta charset="utf-8"><title>Fiche de reprise - ${esc(customer?.lastName || '')} ${esc(customer?.firstName || '')}</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <style>
-  @page { size: A4; margin: 0; }
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; background: #eef2f5; font-family: -apple-system, 'Segoe UI', Roboto, Arial, sans-serif; color: #1a2235; }
 
-  /* Barre d'action (visible à l'écran, masquée à l'impression) */
-  .toolbar { position: sticky; top: 0; background: #fff; border-bottom: 1px solid #e2e8f0; padding: 14px 24px; display: flex; gap: 10px; justify-content: center; align-items: center; z-index: 100; box-shadow: 0 1px 4px rgba(0,0,0,0.04); }
+  .toolbar { position: sticky; top: 0; background: #fff; border-bottom: 1px solid #e2e8f0; padding: 14px 24px; display: flex; gap: 10px; justify-content: center; align-items: center; z-index: 100; box-shadow: 0 1px 4px rgba(0,0,0,0.04); flex-wrap: wrap; }
   .toolbar button { padding: 10px 22px; border-radius: 10px; border: none; font-weight: 700; font-size: 0.95rem; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; font-family: inherit; }
-  .toolbar .btn-print { background: ${primary}; color: #fff; }
-  .toolbar .btn-print:hover { background: ${primaryDark}; }
-  .toolbar .btn-close { background: #fff; color: #64748b; border: 1.5px solid #e2e8f0; }
+  .toolbar button:disabled { opacity: 0.5; cursor: wait; }
+  .btn-pdf { background: ${primary}; color: #fff; }
+  .btn-pdf:hover:not(:disabled) { background: ${primaryDark}; }
+  .btn-print { background: #fff; color: ${primaryDark}; border: 1.5px solid ${primary}; }
+  .btn-print:hover:not(:disabled) { background: ${primaryLight}; }
+  .btn-close { background: #fff; color: #64748b; border: 1.5px solid #e2e8f0; }
 
-  /* Page A4 centrée à l'écran */
   .page-wrap { display: flex; justify-content: center; padding: 28px 20px; }
   .sheet { width: 210mm; max-width: 100%; background: #fff; padding: 18mm 18mm; box-shadow: 0 6px 24px rgba(0,0,0,0.08); border-radius: 4px; }
 
-  /* En-tête avec logo */
   .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid ${primary}; padding-bottom: 14px; margin-bottom: 22px; }
   .header .logo { height: 56px; width: auto; max-width: 280px; object-fit: contain; }
   .header .right { text-align: right; }
@@ -1246,7 +1251,6 @@ function printInvoiceSheet({ theme, product, brand, storage, calc, evaluation, c
   .header .right .dates { font-size: 10pt; color: #475569; line-height: 1.5; }
   .header .right .dates strong { color: #1a2235; }
 
-  /* Sections */
   .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-bottom: 18px; }
   .card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px 16px; }
   .card h3 { font-size: 9.5pt; margin: 0 0 10px; text-transform: uppercase; letter-spacing: 0.08em; color: ${primaryDark}; font-weight: 800; }
@@ -1255,45 +1259,40 @@ function printInvoiceSheet({ theme, product, brand, storage, calc, evaluation, c
   .card td.lbl { color: #64748b; width: 45%; }
   .card td.val { font-weight: 600; color: #1a2235; }
 
-  /* Encadré prix */
-  .price-box { padding: 22px 18px; background: linear-gradient(135deg, ${primaryLight} 0%, #ffffff 100%); border: 2.5px solid ${primary}; border-radius: 14px; text-align: center; margin-bottom: 18px; }
+  .price-box { padding: 22px 18px; background: ${primaryLight}; border: 2.5px solid ${primary}; border-radius: 14px; text-align: center; margin-bottom: 18px; }
   .price-box .lbl { font-size: 10pt; font-weight: 700; color: ${primaryDark}; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px; }
   .price-box .amt { font-size: 38pt; font-weight: 800; color: ${primaryDark}; line-height: 1; letter-spacing: -0.02em; }
   .price-box .sub { font-size: 10pt; color: #475569; margin-top: 6px; }
 
-  /* Validité */
   .validity { padding: 12px 16px; background: #fff7ed; border: 1.5px solid #fdba74; border-radius: 10px; font-size: 10.5pt; text-align: center; margin-bottom: 22px; color: #9a3412; font-weight: 600; }
 
-  /* Signatures */
   .signatures { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; margin-top: 32px; }
   .signatures .col { text-align: center; }
   .signatures .col .label { color: #64748b; font-size: 10pt; margin-bottom: 56px; font-weight: 600; }
   .signatures .col .line { border-top: 1.5px solid #94a3b8; margin: 0 12px; }
 
-  /* Pied de page */
   .footer { margin-top: 22px; padding-top: 12px; border-top: 1px solid #e2e8f0; font-size: 8.5pt; color: #94a3b8; text-align: center; }
 
-  /* Règles d'impression — simples et fiables (testé Chrome/Edge/Firefox) */
   @media print {
-    @page { size: A4; margin: 12mm; }
-    html, body { background: #fff !important; margin: 0; padding: 0; }
+    @page { size: A4; margin: 10mm; }
+    html, body { background: #fff !important; }
     .toolbar { display: none !important; }
-    .page-wrap { display: block !important; padding: 0 !important; margin: 0 !important; }
-    .sheet { box-shadow: none !important; border-radius: 0 !important; padding: 0 !important; margin: 0 !important; width: auto !important; min-height: auto !important; max-width: 100% !important; }
-    .card { break-inside: avoid; }
-    .price-box, .validity, .signatures { break-inside: avoid; }
+    .page-wrap { padding: 0 !important; }
+    .sheet { box-shadow: none !important; border-radius: 0 !important; padding: 0 !important; width: auto !important; }
+    .card, .price-box, .validity, .signatures { break-inside: avoid; }
   }
 </style></head>
 <body>
   <div class="toolbar">
-    <button class="btn-print" id="btnPrint" disabled onclick="doPrint()">⏳ Préparation...</button>
+    <button class="btn-pdf" id="btnPdf" onclick="downloadPdf()">📄 Télécharger en PDF</button>
+    <button class="btn-print" id="btnPrint" onclick="doPrint()">🖨 Imprimer</button>
     <button class="btn-close" onclick="window.close()">Fermer</button>
   </div>
 
   <div class="page-wrap">
-    <div class="sheet">
+    <div class="sheet" id="sheet">
       <div class="header">
-        <img class="logo" id="logoImg" src="${LOGO_DATA_URL}" alt="Care Reprise" />
+        <img class="logo" id="logoImg" src="${logoSrc}" alt="Logo" crossorigin="anonymous" />
         <div class="right">
           <div class="title-line">Offre de rachat</div>
           <div class="dates">
@@ -1354,34 +1353,44 @@ function printInvoiceSheet({ theme, product, brand, storage, calc, evaluation, c
       </div>
     </div>
   </div>
+
   <script>
-    // On attend que le logo soit chargé pour activer le bouton.
-    // Évite l'aperçu vide sur Chrome Windows (cas où l'image base64 est encore en décodage).
-    function readyPrint() {
-      var btn = document.getElementById('btnPrint');
-      btn.disabled = false;
-      btn.textContent = '🖨 Imprimer cette fiche';
-    }
     function doPrint() {
-      // Petit délai pour laisser le rendu finir avant d'ouvrir l'aperçu
-      setTimeout(function(){ window.print(); }, 100);
+      setTimeout(function(){ window.print(); }, 150);
     }
-    var img = document.getElementById('logoImg');
-    if (img && img.complete && img.naturalWidth > 0) {
-      readyPrint();
-    } else if (img) {
-      img.addEventListener('load', readyPrint);
-      img.addEventListener('error', readyPrint); // même si le logo échoue, on permet d'imprimer
-      // Sécurité : timeout au cas où ni load ni error ne déclenchent
-      setTimeout(readyPrint, 1500);
-    } else {
-      readyPrint();
+    function downloadPdf() {
+      var btn = document.getElementById('btnPdf');
+      btn.disabled = true;
+      btn.textContent = '⏳ Génération du PDF...';
+      var sheet = document.getElementById('sheet');
+      var opt = {
+        margin: [10, 10, 10, 10],
+        filename: '${filename}',
+        image: { type: 'jpeg', quality: 0.95 },
+        html2canvas: { scale: 2, useCORS: true, logging: false, backgroundColor: '#ffffff' },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+        pagebreak: { mode: ['css', 'legacy'] }
+      };
+      if (typeof html2pdf === 'undefined') {
+        alert('La bibliothèque PDF est en cours de chargement. Réessayez dans quelques secondes.');
+        btn.disabled = false; btn.textContent = '📄 Télécharger en PDF';
+        return;
+      }
+      html2pdf().from(sheet).set(opt).save().then(function(){
+        btn.disabled = false;
+        btn.textContent = '📄 Télécharger en PDF';
+      }).catch(function(err){
+        console.error(err);
+        alert('Erreur lors de la génération du PDF. Essayez le bouton Imprimer.');
+        btn.disabled = false;
+        btn.textContent = '📄 Télécharger en PDF';
+      });
     }
   </script>
 </body></html>`;
 
   const w = window.open('', '_blank', 'width=920,height=1000');
-  if (!w) { alert("La fenêtre d'impression a été bloquée par votre navigateur. Autorisez les pop-ups pour ce site puis réessayez."); return; }
+  if (!w) { alert("La fenêtre a été bloquée par votre navigateur. Autorisez les pop-ups pour ce site puis réessayez."); return; }
   w.document.open(); w.document.write(html); w.document.close();
 }
 
@@ -1765,6 +1774,55 @@ function AppearanceTab({ theme, setTheme }) {
             <div style={{ marginTop: 8, padding: 12, background: theme.surface, borderRadius: 10, display: 'flex', alignItems: 'center', gap: 10 }}>
               <span style={{ fontSize: '0.85rem', color: theme.textMuted }}>Aperçu :</span>
               <img src={theme.logoUrl} alt="logo" style={{ height: 32 }} onError={(e) => e.target.style.display = 'none'} />
+            </div>
+          )}
+        </Field>
+
+        <Field label="Logo de la fiche PDF / impression (haut du document A4)">
+          <p style={{ fontSize: '0.82rem', color: theme.textMuted, margin: '0 0 8px' }}>
+            Ce logo apparaît en haut à gauche de chaque fiche imprimée ou téléchargée en PDF.
+            Laisser vide pour utiliser le logo Care par défaut.
+          </p>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
+            <input
+              className="rc-input"
+              type="text"
+              placeholder="URL https://... ou laisser vide"
+              value={theme.printLogoUrl || ''}
+              onChange={(e) => setTheme({ ...theme, printLogoUrl: e.target.value })}
+              style={{ ...inputStyle(theme), flex: 1, minWidth: 200 }}
+            />
+            <label className="rc-btn" style={{ padding: '9px 14px', borderRadius: 10, border: `1.5px solid ${theme.primary}30`, background: '#fff', color: theme.primary, fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              <Upload size={14} /> Téléverser une image
+              <input
+                type="file"
+                accept="image/*"
+                style={{ display: 'none' }}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  if (file.size > 500 * 1024) { alert('Image trop lourde (max 500 Ko). Réduisez sa taille.'); return; }
+                  const reader = new FileReader();
+                  reader.onload = () => setTheme({ ...theme, printLogoUrl: reader.result });
+                  reader.readAsDataURL(file);
+                  e.target.value = '';
+                }}
+              />
+            </label>
+            {theme.printLogoUrl && (
+              <button
+                onClick={() => setTheme({ ...theme, printLogoUrl: '' })}
+                className="rc-btn"
+                style={{ padding: '9px 14px', borderRadius: 10, border: 'none', background: 'transparent', color: '#dc2626', cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem' }}
+              >
+                <Trash2 size={13} style={{ verticalAlign: 'middle', marginRight: 4 }} /> Retirer
+              </button>
+            )}
+          </div>
+          {theme.printLogoUrl && (
+            <div style={{ padding: 12, background: '#fff', borderRadius: 10, border: `1px dashed ${theme.primary}30`, textAlign: 'center' }}>
+              <div style={{ fontSize: '0.78rem', color: theme.textMuted, marginBottom: 6 }}>Aperçu du logo PDF :</div>
+              <img src={theme.printLogoUrl} alt="logo PDF" style={{ height: 50, maxWidth: '100%', objectFit: 'contain' }} onError={(e) => e.target.style.display = 'none'} />
             </div>
           )}
         </Field>
