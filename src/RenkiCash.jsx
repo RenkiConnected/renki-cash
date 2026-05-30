@@ -630,10 +630,17 @@ export default function RenkiCash() {
         {view === 'home' && <HomeView theme={theme} brands={brands} products={products} onSelectBrand={(b) => { setSelectedBrand(b); setView('brand'); }} searchQuery={searchQuery} filteredProducts={filteredProducts} onSelectProduct={(p) => { setSelectedBrand(brands.find(b => b.id === p.brand)); setSelectedProduct(p); setView('product'); }} />}
         {view === 'brand' && selectedBrand && <BrandView theme={theme} brand={selectedBrand} products={products.filter(p => p.brand === selectedBrand.id)} onSelectProduct={(p) => { setSelectedProduct(p); setView('product'); }} />}
         {view === 'product' && selectedProduct && <ProductView theme={theme} product={selectedProduct} brand={brands.find(b => b.id === selectedProduct.brand)} selectedStorage={selectedStorage} setSelectedStorage={setSelectedStorage} competitorPrice={competitorPrice} setCompetitorPrice={setCompetitorPrice} evaluation={evaluation} setEvaluation={setEvaluation} pricing={pricing} evaluationComplete={evaluationComplete} currentCalc={currentCalc} onValidate={(boost) => {
-          // Applique le boost reprise au prix final si présent
+          // Applique le boost reprise au prix final + à la revente conseillée
           const b = boost || 0;
           const finalized = b > 0
-            ? { ...currentCalc, price: currentCalc.price + b, boost: b, breakdown: [...(currentCalc.breakdown || []), { label: `Boost reprise (+${b} €)`, value: b, type: 'bonus' }] }
+            ? {
+                ...currentCalc,
+                price: currentCalc.price + b,
+                resaleMin: currentCalc.resaleMin + b,
+                resaleMax: currentCalc.resaleMax + b,
+                boost: b,
+                breakdown: [...(currentCalc.breakdown || []), { label: `Boost reprise (+${b} €)`, value: b, type: 'bonus' }],
+              }
             : currentCalc;
           setFinalCalc(finalized);
           setView('customer');
@@ -1136,7 +1143,7 @@ function ProductView({ theme, product, brand, selectedStorage, setSelectedStorag
 
             <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid rgba(255,255,255,0.25)', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
               <span style={{ fontSize: '0.85rem', opacity: 0.9, fontWeight: 600 }}>Prix de revente conseillé :</span>
-              <span style={{ fontSize: '1.3rem', fontWeight: 800, fontFamily: 'Manrope, sans-serif' }}>{currentCalc.resaleMin} € – {currentCalc.resaleMax} €</span>
+              <span style={{ fontSize: '1.3rem', fontWeight: 800, fontFamily: 'Manrope, sans-serif' }}>{currentCalc.resaleMin + boost} € – {currentCalc.resaleMax + boost} €</span>
               <span style={{ fontSize: '0.78rem', opacity: 0.85 }}>(marge {pricing.resaleMarginMin}–{pricing.resaleMarginMax} €)</span>
             </div>
           </div>
