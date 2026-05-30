@@ -629,7 +629,15 @@ export default function RenkiCash() {
       <main style={{ maxWidth: 1280, margin: '0 auto', padding: '24px 16px 80px' }}>
         {view === 'home' && <HomeView theme={theme} brands={brands} products={products} onSelectBrand={(b) => { setSelectedBrand(b); setView('brand'); }} searchQuery={searchQuery} filteredProducts={filteredProducts} onSelectProduct={(p) => { setSelectedBrand(brands.find(b => b.id === p.brand)); setSelectedProduct(p); setView('product'); }} />}
         {view === 'brand' && selectedBrand && <BrandView theme={theme} brand={selectedBrand} products={products.filter(p => p.brand === selectedBrand.id)} onSelectProduct={(p) => { setSelectedProduct(p); setView('product'); }} />}
-        {view === 'product' && selectedProduct && <ProductView theme={theme} product={selectedProduct} brand={brands.find(b => b.id === selectedProduct.brand)} selectedStorage={selectedStorage} setSelectedStorage={setSelectedStorage} competitorPrice={competitorPrice} setCompetitorPrice={setCompetitorPrice} evaluation={evaluation} setEvaluation={setEvaluation} pricing={pricing} evaluationComplete={evaluationComplete} currentCalc={currentCalc} onValidate={() => { setFinalCalc(currentCalc); setView('customer'); }} onBack={() => setView('brand')} />}
+        {view === 'product' && selectedProduct && <ProductView theme={theme} product={selectedProduct} brand={brands.find(b => b.id === selectedProduct.brand)} selectedStorage={selectedStorage} setSelectedStorage={setSelectedStorage} competitorPrice={competitorPrice} setCompetitorPrice={setCompetitorPrice} evaluation={evaluation} setEvaluation={setEvaluation} pricing={pricing} evaluationComplete={evaluationComplete} currentCalc={currentCalc} onValidate={(boost) => {
+          // Applique le boost reprise au prix final si présent
+          const b = boost || 0;
+          const finalized = b > 0
+            ? { ...currentCalc, price: currentCalc.price + b, boost: b, breakdown: [...(currentCalc.breakdown || []), { label: `Boost reprise (+${b} €)`, value: b, type: 'bonus' }] }
+            : currentCalc;
+          setFinalCalc(finalized);
+          setView('customer');
+        }} onBack={() => setView('brand')} />}
         {view === 'customer' && finalCalc && <CustomerView theme={theme} customer={customer} setCustomer={setCustomer} onBack={() => setView('product')} onConfirm={() => {
           // Enregistrer dans l'historique
           const entry = {
@@ -939,9 +947,12 @@ function ProductCard({ product, brand, theme, onClick, delay = 0 }) {
 // ================== PRODUCT VIEW (formulaire d'évaluation) ==================
 function ProductView({ theme, product, brand, selectedStorage, setSelectedStorage, competitorPrice, setCompetitorPrice, evaluation, setEvaluation, pricing, evaluationComplete, currentCalc, onValidate, onBack }) {
   const storageOptions = product.storage || [];
+  const [boost, setBoost] = useState(0); // bonus "Boost reprise" appliqué avant validation
   useEffect(() => {
     if (!selectedStorage && storageOptions[0]) setSelectedStorage(storageOptions[0]);
   }, [product]);
+  // Réinitialiser le boost si on change de produit (sécurité)
+  useEffect(() => { setBoost(0); }, [product?.id]);
 
   const discountPct = Math.round(pricing.competitorDiscount * 100);
 
@@ -1071,17 +1082,58 @@ function ProductView({ theme, product, brand, selectedStorage, setSelectedStorag
           <div className="rc-price-display rc-fade" style={{ padding: 24, borderRadius: 20, color: '#fff', boxShadow: `0 12px 32px ${theme.primary}40` }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
               <div>
-                <div style={{ fontSize: '0.85rem', opacity: 0.9, fontWeight: 600 }}>Prix de rachat</div>
-                <div style={{ fontSize: '2.4rem', fontWeight: 800, fontFamily: 'Manrope, sans-serif', letterSpacing: '-0.02em', lineHeight: 1 }}>{currentCalc.price} €</div>
+                <div style={{ fontSize: '0.85rem', opacity: 0.9, fontWeight: 600 }}>Prix de rachat {boost > 0 && <span style={{ fontWeight: 700 }}>(boost +{boost} €)</span>}</div>
+                <div style={{ fontSize: '2.4rem', fontWeight: 800, fontFamily: 'Manrope, sans-serif', letterSpacing: '-0.02em', lineHeight: 1 }}>
+                  {currentCalc.price + boost} €
+                </div>
               </div>
               <button
                 className="rc-btn"
-                onClick={onValidate}
+                onClick={() => onValidate(boost)}
                 style={{ padding: '14px 26px', borderRadius: 12, border: 'none', background: '#fff', color: theme.primaryDark, fontWeight: 800, fontSize: '1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }}
               >
                 Valider la reprise <ChevronRight size={18} />
               </button>
             </div>
+
+            {/* Boost reprise — boutons pour ajouter un bonus avant validation */}
+            <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid rgba(255,255,255,0.25)' }}>
+              <div style={{ fontSize: '0.85rem', opacity: 0.9, fontWeight: 700, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Sparkles size={15} /> Boost reprise
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                {[5, 10, 20, 30].map((b) => {
+                  const active = boost === b;
+                  return (
+                    <button
+                      key={b}
+                      className="rc-btn"
+                      onClick={() => setBoost(active ? 0 : b)}
+                      style={{
+                        padding: '8px 16px', borderRadius: 999,
+                        border: `2px solid ${active ? '#fff' : 'rgba(255,255,255,0.4)'}`,
+                        background: active ? '#fff' : 'transparent',
+                        color: active ? theme.primaryDark : '#fff',
+                        fontWeight: 800, fontSize: '0.92rem', cursor: 'pointer',
+                        transition: 'all 0.15s',
+                      }}
+                    >
+                      +{b} €
+                    </button>
+                  );
+                })}
+                {boost > 0 && (
+                  <button
+                    className="rc-btn"
+                    onClick={() => setBoost(0)}
+                    style={{ padding: '8px 14px', borderRadius: 999, border: 'none', background: 'transparent', color: '#fff', opacity: 0.85, fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer' }}
+                  >
+                    ✕ Annuler
+                  </button>
+                )}
+              </div>
+            </div>
+
             <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid rgba(255,255,255,0.25)', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
               <span style={{ fontSize: '0.85rem', opacity: 0.9, fontWeight: 600 }}>Prix de revente conseillé :</span>
               <span style={{ fontSize: '1.3rem', fontWeight: 800, fontFamily: 'Manrope, sans-serif' }}>{currentCalc.resaleMin} € – {currentCalc.resaleMax} €</span>
