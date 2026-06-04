@@ -1000,10 +1000,10 @@ function ProductView({ theme, product, brand, selectedStorage, setSelectedStorag
             {(() => {
               const q = encodeURIComponent(`${product.name}${selectedStorage ? ' ' + selectedStorage : ''}`);
               const sites = [
-                { name: 'Back Market', color: '#1D2D5C', url: `https://www.backmarket.fr/fr-fr/search?q=${q}` },
-                { name: 'Easy Cash',   color: '#E2001A', url: `https://www.easycash.fr/recherche?q=${q}` },
-                { name: 'Recommerce',  color: '#00A88E', url: `https://fr.recommerce.com/recherche?q=${q}` },
-                { name: 'Google',      color: '#4285F4', url: `https://www.google.com/search?q=${q}+reconditionn%C3%A9+prix` },
+                { name: 'Back Market',    color: '#1D2D5C', url: `https://www.backmarket.fr/fr-fr/search?q=${q}` },
+                { name: 'Easy Cash',      color: '#E2001A', url: `https://www.easycash.fr/search?q=${q}` },
+                { name: 'AsGoodAsNew',    color: '#2E7D32', url: `https://vendre.asgoodasnew.fr/search?q=${q}` },
+                { name: 'Google',         color: '#4285F4', url: `https://www.google.com/search?q=${q}+reconditionn%C3%A9+prix` },
               ];
               return (
                 <div style={{ marginBottom: 12 }}>
