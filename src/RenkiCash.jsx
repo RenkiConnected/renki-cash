@@ -601,7 +601,7 @@ export default function RenkiCash() {
     .rc-price-display { background: linear-gradient(135deg, ${theme.primary} 0%, ${theme.primaryDark} 100%); background-size: 200% 200%; animation: rc-shimmer 3s linear infinite; }
     @media (max-width: 640px) {
       .rc-grid-brands { grid-template-columns: repeat(2, 1fr) !important; }
-      .rc-grid-products { grid-template-columns: repeat(1, 1fr) !important; }
+      .rc-grid-products { grid-template-columns: repeat(2, 1fr) !important; }
       .rc-hide-mobile { display: none !important; }
       .rc-header-title { font-size: 1.1rem !important; }
     }
