@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Search, Home, LayoutDashboard, Smartphone, Battery, Camera, FileText, ChevronRight, ChevronUp, ChevronDown, Plus, Edit2, Trash2, Save, X, Palette, Type, Settings, Check, ArrowLeft, Upload, Sparkles, Lock, ExternalLink, Printer, User, Phone, Mail, History } from 'lucide-react';
+import { Search, Home, LayoutDashboard, Smartphone, Battery, Camera, FileText, ChevronRight, ChevronUp, ChevronDown, Plus, Edit2, Trash2, Save, X, Palette, Type, Settings, Check, ArrowLeft, Upload, Sparkles, Lock, ExternalLink, Printer, User, Phone, Mail, History, Info } from 'lucide-react';
 import { loadConfig, saveKey, subscribeConfig, firebaseReady } from './storage';
 
 // Mot de passe d'accès au tableau de bord
@@ -664,6 +664,7 @@ export default function RenkiCash() {
           ? <Dashboard theme={theme} setTheme={setTheme} brands={brands} setBrands={setBrands} products={products} setProducts={setProducts} pricing={pricing} setPricing={setPricing} onLock={() => setDashboardUnlocked(false)} />
           : <DashboardLogin theme={theme} onUnlock={() => setDashboardUnlocked(true)} />
         )}
+        {view === 'info' && <InfoView theme={theme} />}
         {view === 'history' && (historyUnlocked
           ? <HistoryView theme={theme} history={history} setHistory={setHistory} products={products} brands={brands} pricing={pricing} onLock={() => setHistoryUnlocked(false)} />
           : <HistoryLogin theme={theme} onUnlock={() => setHistoryUnlocked(true)} />
@@ -716,6 +717,7 @@ function Header({ theme, view, setView, goHome, searchQuery, setSearchQuery }) {
 
         <nav style={{ display: 'flex', gap: 8, marginLeft: 'auto' }}>
           <NavBtn theme={theme} active={view === 'home'} onClick={goHome} icon={<Home size={18} />} label="Accueil" />
+          <NavBtn theme={theme} active={view === 'info'} onClick={() => setView('info')} icon={<Info size={18} />} label="Infos" />
           <NavBtn theme={theme} active={view === 'history'} onClick={() => setView('history')} icon={<History size={18} />} label="Historique" />
           <NavBtn theme={theme} active={view === 'dashboard'} onClick={() => setView('dashboard')} icon={<LayoutDashboard size={18} />} label="Dashboard" />
         </nav>
@@ -979,6 +981,11 @@ function ProductView({ theme, product, brand, selectedStorage, setSelectedStorag
             <div style={{ fontSize: '0.78rem', fontWeight: 700, color: theme.primary, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{brand?.name}</div>
             <h2 style={{ fontSize: '1.4rem', fontWeight: 800, margin: '4px 0', fontFamily: 'Manrope, sans-serif', letterSpacing: '-0.01em' }}>{product.name}</h2>
             <div style={{ fontSize: '0.88rem', color: theme.textMuted }}>Renseignez les critères pour obtenir votre prix</div>
+            {/* Lien vérification IMEI */}
+            <a href="https://www.imei.info/fr/" target="_blank" rel="noopener noreferrer"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 5, marginTop: 8, fontSize: '0.78rem', fontWeight: 700, color: '#dc2626', textDecoration: 'none', padding: '4px 10px', borderRadius: 999, border: '1.5px solid #dc262620', background: '#fef2f2' }}>
+              🔍 Vérifier si le téléphone n'est pas volé (IMEI)
+            </a>
           </div>
         </div>
 
@@ -1533,6 +1540,164 @@ function Row({ label, value, last }) {
     <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: last ? 'none' : '1px solid #e5e7eb', fontSize: '0.92rem' }}>
       <span style={{ color: '#64748B' }}>{label}</span>
       <span style={{ fontWeight: 600 }}>{value}</span>
+    </div>
+  );
+}
+
+// ================== INFO VIEW (informations reprise mobile) ==================
+function InfoView({ theme }) {
+  const Card = ({ icon, title, color, children }) => (
+    <div style={{ background: '#fff', borderRadius: 16, padding: 24, border: `1px solid ${color}20`, boxShadow: '0 2px 12px rgba(0,0,0,0.04)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+        <div style={{ width: 44, height: 44, borderRadius: 12, background: color + '15', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.4rem', flexShrink: 0 }}>{icon}</div>
+        <h3 style={{ fontSize: '1.05rem', fontWeight: 800, margin: 0, fontFamily: 'Manrope, sans-serif', color: '#1a2235' }}>{title}</h3>
+      </div>
+      {children}
+    </div>
+  );
+  const Item = ({ icon, title, desc, color = theme.primary }) => (
+    <div style={{ display: 'flex', gap: 12, padding: '12px 0', borderBottom: '1px solid #f1f5f9' }}>
+      <div style={{ fontSize: '1.3rem', flexShrink: 0, marginTop: 2 }}>{icon}</div>
+      <div>
+        <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#1a2235', marginBottom: 3 }}>{title}</div>
+        <div style={{ fontSize: '0.85rem', color: '#64748b', lineHeight: 1.5 }}>{desc}</div>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="rc-fade" style={{ maxWidth: 760, margin: '0 auto' }}>
+      {/* Héro */}
+      <div style={{ borderRadius: 20, background: `linear-gradient(135deg, ${theme.primary} 0%, ${theme.primaryDark} 100%)`, padding: '32px 28px', marginBottom: 24, color: '#fff', position: 'relative', overflow: 'hidden' }}>
+        <div style={{ position: 'absolute', right: -20, top: -20, fontSize: '8rem', opacity: 0.08, lineHeight: 1 }}>📱</div>
+        <div style={{ fontSize: '2rem', marginBottom: 8 }}>📋</div>
+        <h1 style={{ fontSize: '1.7rem', fontWeight: 800, margin: '0 0 8px', fontFamily: 'Manrope, sans-serif', letterSpacing: '-0.02em' }}>Informations sur la reprise mobile</h1>
+        <p style={{ margin: 0, opacity: 0.9, fontSize: '0.95rem', lineHeight: 1.5 }}>
+          Tout ce que vous devez savoir pour vendre votre téléphone en toute sérénité et légalité.
+        </p>
+      </div>
+
+      <div style={{ display: 'grid', gap: 16 }}>
+
+        {/* Documents obligatoires */}
+        <Card icon="🪪" title="Documents obligatoires à apporter" color={theme.primary}>
+          <Item
+            icon="🪪"
+            title="Pièce d'identité en cours de validité"
+            desc="Carte nationale d'identité ou passeport obligatoire. Requis par la loi pour toute transaction de rachat (obligation de registre de police). Sans pièce d'identité, aucune reprise ne peut être effectuée."
+          />
+          <Item
+            icon="🧾"
+            title="Facture d'achat (téléphones de moins de 2 ans)"
+            desc="Si votre téléphone a été acheté il y a moins de 2 ans, la facture d'achat originale est indispensable. Voir explication détaillée ci-dessous."
+          />
+          <Item
+            icon="🏦"
+            title="RIB (Relevé d'Identité Bancaire)"
+            desc="Nécessaire pour le versement du montant de la reprise par virement bancaire sécurisé. Le paiement en espèces reste possible selon les montants et la réglementation en vigueur."
+          />
+        </Card>
+
+        {/* Pourquoi la facture */}
+        <Card icon="⚠️" title="Pourquoi la facture est obligatoire pour les téléphones de moins de 2 ans" color="#f59e0b">
+          <div style={{ background: '#fffbeb', border: '1.5px solid #fde68a', borderRadius: 12, padding: 16, marginBottom: 16 }}>
+            <p style={{ margin: '0 0 10px', fontSize: '0.9rem', lineHeight: 1.6, color: '#92400e', fontWeight: 600 }}>
+              ⚠️ Un téléphone acheté sous contrat opérateur n'appartient pas encore pleinement à son porteur.
+            </p>
+            <p style={{ margin: 0, fontSize: '0.85rem', lineHeight: 1.6, color: '#78350f' }}>
+              Lorsqu'un téléphone est acquis dans le cadre d'un abonnement avec engagement (24 mois), une partie du prix est subventionnée par l'opérateur. Si les mensualités ne sont pas toutes réglées, l'appareil peut techniquement être considéré comme n'appartenant pas totalement au client.
+            </p>
+          </div>
+          <Item
+            icon="🔒"
+            title="Risque de blocage par l'opérateur"
+            desc="Un téléphone encore sous contrat peut être bloqué à distance par l'opérateur (via l'IMEI) en cas d'impayés ou de litige. Cela rendrait l'appareil inutilisable après la reprise, causant un préjudice au magasin."
+          />
+          <Item
+            icon="⚖️"
+            title="Protection juridique du magasin et du client"
+            desc="La facture prouve que l'appareil a bien été acheté par la personne qui le vend et qu'il est libre de tout engagement contractuel en cours. Sans cette preuve, la reprise engage la responsabilité des deux parties."
+          />
+          <Item
+            icon="📱"
+            title="Comment savoir si votre téléphone est encore sous contrat ?"
+            desc="Vérifiez votre contrat opérateur ou contactez votre service client. Si vous payez encore des mensualités pour votre téléphone, il est probablement encore sous engagement. Attendez la fin du contrat avant de procéder à la reprise."
+          />
+        </Card>
+
+        {/* Cadre légal */}
+        <Card icon="⚖️" title="Cadre légal de la reprise de téléphones" color="#8b5cf6">
+          <Item
+            icon="📜"
+            title="Obligation de registre de police (Art. L321-7 Code de commerce)"
+            desc="Tout professionnel achetant des objets d'occasion à des particuliers doit tenir un registre de police. Chaque transaction est enregistrée avec l'identité du vendeur et les caractéristiques de l'appareil (IMEI inclus). Ce registre est transmis aux autorités et conservé 5 ans minimum."
+          />
+          <Item
+            icon="🚫"
+            title="Recel d'objet volé (Art. 321-1 Code pénal)"
+            desc="Acheter ou détenir un bien dont on sait ou aurait dû savoir qu'il est le produit d'un crime ou délit est punissable de 5 ans d'emprisonnement et 375 000 € d'amende. Vérifier l'IMEI et demander les documents est une protection légale essentielle."
+          />
+          <Item
+            icon="🔍"
+            title="Vérification IMEI obligatoire"
+            desc="L'IMEI (numéro unique à 15 chiffres) permet de vérifier si un téléphone est déclaré volé ou perdu. Les professionnels de la reprise ont l'obligation morale et pratique de vérifier ce statut avant toute transaction."
+          />
+          <Item
+            icon="👤"
+            title="Âge minimum du vendeur"
+            desc="Le vendeur doit être majeur (18 ans) ou accompagné d'un représentant légal. Une pièce d'identité valide est systématiquement exigée et copiée dans le registre de police."
+          />
+        </Card>
+
+        {/* Vérification IMEI */}
+        <Card icon="🔍" title="Vérifier l'IMEI avant la reprise" color="#dc2626">
+          <div style={{ background: '#fef2f2', border: '1.5px solid #fecaca', borderRadius: 12, padding: 16, marginBottom: 16 }}>
+            <p style={{ margin: '0 0 8px', fontSize: '0.9rem', fontWeight: 700, color: '#991b1b' }}>
+              🔍 Comment trouver l'IMEI d'un téléphone ?
+            </p>
+            <p style={{ margin: 0, fontSize: '0.85rem', color: '#7f1d1d', lineHeight: 1.6 }}>
+              Composez <strong>*#06#</strong> sur le clavier du téléphone, ou accédez à <strong>Paramètres → À propos du téléphone</strong>. L'IMEI est un numéro unique de 15 chiffres.
+            </p>
+          </div>
+          <Item
+            icon="✅"
+            title="Site de vérification recommandé : imei.info"
+            desc="Service 100% gratuit, base de données mondiale (110+ millions d'IMEI), toutes marques compatibles. Vérifie le statut blacklist (volé/perdu), le simlock, la garantie constructeur et l'authenticité de l'appareil."
+          />
+          <div style={{ marginTop: 12 }}>
+            <a href="https://www.imei.info/fr/" target="_blank" rel="noopener noreferrer"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '12px 20px', borderRadius: 12, background: '#dc2626', color: '#fff', fontWeight: 700, fontSize: '0.95rem', textDecoration: 'none' }}>
+              🔍 Vérifier un IMEI maintenant sur imei.info
+              <ExternalLink size={15} />
+            </a>
+          </div>
+        </Card>
+
+        {/* Bon à savoir */}
+        <Card icon="💡" title="Bon à savoir" color="#10b981">
+          <Item
+            icon="💰"
+            title="Le prix de reprise est indicatif"
+            desc="L'offre affichée sur ce site est basée sur les prix du marché du reconditionné. Elle peut être ajustée après vérification physique de l'appareil en magasin (rayures non déclarées, batterie dégradée, accessoires manquants…)."
+          />
+          <Item
+            icon="📅"
+            title="Validité de l'offre : 15 jours"
+            desc="L'offre de reprise générée est valable 15 jours à compter de la date d'estimation. Passé ce délai, une nouvelle évaluation sera nécessaire car les prix du marché évoluent."
+          />
+          <Item
+            icon="🔄"
+            title="État de l'appareil au moment de la reprise"
+            desc="L'état déclaré lors de l'estimation en ligne sera vérifié en magasin. Toute différence (écran fissuré non déclaré, caméra défectueuse…) entraînera une révision du prix."
+          />
+          <Item
+            icon="🌱"
+            title="Économie circulaire et impact environnemental"
+            desc="En reprenant votre téléphone, vous contribuez à réduire les déchets électroniques. Un smartphone reconditionné génère 87% d'émissions de CO₂ en moins qu'un appareil neuf. Merci pour votre geste éco-responsable."
+          />
+        </Card>
+
+      </div>
     </div>
   );
 }
