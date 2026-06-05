@@ -486,31 +486,33 @@ function computeBuybackPrice({ product, competitorPrice, evaluation, pricing }) 
 }
 
 // ================== APP PRINCIPALE ==================
+// Listes initiales boutiques et vendeurs
+const INITIAL_SHOPS = ['Brignoles', 'Hyères', 'Cogolin', 'Saint Raphaël', 'Vitrolles', 'Le Pontet'];
+const INITIAL_SELLERS = ['David', 'Yannis', 'Sebastien', 'Florent', 'Quentin K', 'Michael', 'Antho', 'Romain', 'Damien', 'Gillou', 'Leo', 'Anouar', 'Adrien', 'Yasmine', 'Julia', 'Sam', 'Cindy', 'Johan'];
+
 export default function RenkiCash() {
-  const [view, setView] = useState('home'); // home | brand | product | dashboard | result
+  const [view, setView] = useState('home');
   const [theme, setTheme] = useState(DEFAULT_THEME);
   const [brands, setBrands] = useState(INITIAL_BRANDS);
   const [products, setProducts] = useState(INITIAL_PRODUCTS);
   const [pricing, setPricing] = useState(INITIAL_PRICING);
+  const [shops, setShops] = useState(INITIAL_SHOPS);
+  const [sellers, setSellers] = useState(INITIAL_SELLERS);
   const [selectedBrand, setSelectedBrand] = useState(null);
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [selectedStorage, setSelectedStorage] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [evaluation, setEvaluation] = useState({
-    condition: null,
-    battery: null,
-    camera: null,
-    invoice: null,
+    condition: null, battery: null, camera: null, invoice: null,
   });
   const [finalCalc, setFinalCalc] = useState(null);
-  const [competitorPrice, setCompetitorPrice] = useState(''); // prix de vente concurrent saisi manuellement
-  const [dashboardUnlocked, setDashboardUnlocked] = useState(false); // accès dashboard déverrouillé ?
-  const [historyUnlocked, setHistoryUnlocked] = useState(false); // accès historique déverrouillé ?
-  const [history, setHistory] = useState([]); // historique des estimations validées
-  const [customer, setCustomer] = useState({ firstName: '', lastName: '', phone: '', email: '' }); // infos client en cours
-  const hydrated = useRef(false); // évite de ré-sauvegarder pendant le chargement initial
+  const [competitorPrice, setCompetitorPrice] = useState('');
+  const [dashboardUnlocked, setDashboardUnlocked] = useState(false);
+  const [historyUnlocked, setHistoryUnlocked] = useState(false);
+  const [history, setHistory] = useState([]);
+  const [customer, setCustomer] = useState({ firstName: '', lastName: '', phone: '', email: '', shop: '', seller: '' });
+  const hydrated = useRef(false);
 
-  // Applique un objet de config (venant de Firebase ou du local) sur les états
   const applyConfig = (cfg) => {
     if (!cfg) return;
     if (cfg.theme) setTheme({ ...DEFAULT_THEME, ...cfg.theme });
@@ -518,6 +520,8 @@ export default function RenkiCash() {
     if (cfg.brands) setBrands(cfg.brands);
     if (cfg.pricing) setPricing(cfg.pricing);
     if (cfg.history) setHistory(cfg.history);
+    if (cfg.shops) setShops(cfg.shops);
+    if (cfg.sellers) setSellers(cfg.sellers);
   };
 
   // Chargement initial + écoute temps réel (si Firebase configuré)
@@ -539,6 +543,8 @@ export default function RenkiCash() {
   useEffect(() => { if (hydrated.current) saveKey('brands', brands); }, [brands]);
   useEffect(() => { if (hydrated.current) saveKey('pricing', pricing); }, [pricing]);
   useEffect(() => { if (hydrated.current) saveKey('history', history); }, [history]);
+  useEffect(() => { if (hydrated.current) saveKey('shops', shops); }, [shops]);
+  useEffect(() => { if (hydrated.current) saveKey('sellers', sellers); }, [sellers]);
 
   const evaluationComplete = evaluation.condition && evaluation.battery && evaluation.camera && evaluation.invoice;
 
@@ -565,7 +571,7 @@ export default function RenkiCash() {
     setFinalCalc(null);
     setSearchQuery('');
     setCompetitorPrice('');
-    setCustomer({ firstName: '', lastName: '', phone: '', email: '' });
+    setCustomer({ firstName: '', lastName: '', phone: '', email: '', shop: '', seller: '' });
   };
 
   // Styles inline pour theming dynamique
@@ -645,7 +651,7 @@ export default function RenkiCash() {
           setFinalCalc(finalized);
           setView('customer');
         }} onBack={() => setView('brand')} />}
-        {view === 'customer' && finalCalc && <CustomerView theme={theme} customer={customer} setCustomer={setCustomer} onBack={() => setView('product')} onConfirm={() => {
+        {view === 'customer' && finalCalc && <CustomerView theme={theme} customer={customer} setCustomer={setCustomer} shops={shops} sellers={sellers} onBack={() => setView('product')} onConfirm={() => {
           // Enregistrer dans l'historique
           const entry = {
             id: 'est-' + Date.now(),
@@ -661,12 +667,12 @@ export default function RenkiCash() {
         }} />}
         {view === 'result' && finalCalc && <ResultView theme={theme} product={selectedProduct} storage={selectedStorage} calc={finalCalc} evaluation={evaluation} customer={customer} brand={brands.find(b => b.id === selectedProduct.brand)} pricing={pricing} onRestart={goHome} />}
         {view === 'dashboard' && (dashboardUnlocked
-          ? <Dashboard theme={theme} setTheme={setTheme} brands={brands} setBrands={setBrands} products={products} setProducts={setProducts} pricing={pricing} setPricing={setPricing} onLock={() => setDashboardUnlocked(false)} />
+          ? <Dashboard theme={theme} setTheme={setTheme} brands={brands} setBrands={setBrands} products={products} setProducts={setProducts} pricing={pricing} setPricing={setPricing} shops={shops} setShops={setShops} sellers={sellers} setSellers={setSellers} onLock={() => setDashboardUnlocked(false)} />
           : <DashboardLogin theme={theme} onUnlock={() => setDashboardUnlocked(true)} />
         )}
         {view === 'info' && <InfoView theme={theme} />}
         {view === 'history' && (historyUnlocked
-          ? <HistoryView theme={theme} history={history} setHistory={setHistory} products={products} brands={brands} pricing={pricing} onLock={() => setHistoryUnlocked(false)} />
+          ? <HistoryView theme={theme} history={history} setHistory={setHistory} products={products} brands={brands} pricing={pricing} shops={shops} onLock={() => setHistoryUnlocked(false)} />
           : <HistoryLogin theme={theme} onUnlock={() => setHistoryUnlocked(true)} />
         )}
       </main>
@@ -1207,8 +1213,10 @@ function CriteriaBtn({ theme, selected, onClick, label, desc }) {
 }
 
 // ================== CUSTOMER VIEW (saisie infos client avant validation) ==================
-function CustomerView({ theme, customer, setCustomer, onBack, onConfirm }) {
+function CustomerView({ theme, customer, setCustomer, shops, sellers, onBack, onConfirm }) {
   const [errors, setErrors] = useState({});
+  const [newShop, setNewShop] = useState('');
+  const [newSeller, setNewSeller] = useState('');
   const upd = (k, v) => { setCustomer({ ...customer, [k]: v }); setErrors({ ...errors, [k]: false }); };
 
   const submit = () => {
@@ -1217,6 +1225,8 @@ function CustomerView({ theme, customer, setCustomer, onBack, onConfirm }) {
     if (!customer.lastName.trim()) errs.lastName = true;
     if (!customer.phone.trim()) errs.phone = true;
     if (!customer.email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customer.email)) errs.email = true;
+    if (!customer.shop) errs.shop = true;
+    if (!customer.seller) errs.seller = true;
     if (Object.keys(errs).length > 0) { setErrors(errs); return; }
     onConfirm();
   };
@@ -1225,6 +1235,17 @@ function CustomerView({ theme, customer, setCustomer, onBack, onConfirm }) {
     width: '100%', padding: '12px 14px', borderRadius: 10,
     border: `1.5px solid ${err ? '#dc2626' : theme.primary + '25'}`,
     background: '#fff', fontSize: '1rem', color: theme.text,
+  });
+
+  // Style beau select
+  const selectS = (err) => ({
+    width: '100%', padding: '12px 14px', borderRadius: 10,
+    border: `1.5px solid ${err ? '#dc2626' : theme.primary + '30'}`,
+    background: '#fff', fontSize: '1rem', color: customer.shop || customer.seller ? theme.text : theme.textMuted,
+    appearance: 'none', WebkitAppearance: 'none', cursor: 'pointer',
+    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`,
+    backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center',
+    paddingRight: 36,
   });
 
   return (
@@ -1237,33 +1258,77 @@ function CustomerView({ theme, customer, setCustomer, onBack, onConfirm }) {
         <div style={{ width: 56, height: 56, borderRadius: '50%', background: theme.primaryLight, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 14px' }}>
           <User size={26} style={{ color: theme.primary }} />
         </div>
-        <h2 style={{ fontSize: '1.4rem', fontWeight: 800, margin: 0, fontFamily: 'Manrope, sans-serif' }}>Coordonnées du client</h2>
-        <p style={{ color: theme.textMuted, margin: '6px 0 0', fontSize: '0.9rem' }}>Tous les champs sont obligatoires pour finaliser l'offre de rachat.</p>
+        <h2 style={{ fontSize: '1.4rem', fontWeight: 800, margin: 0, fontFamily: 'Manrope, sans-serif' }}>Informations de la reprise</h2>
+        <p style={{ color: theme.textMuted, margin: '6px 0 0', fontSize: '0.9rem' }}>Tous les champs sont obligatoires pour finaliser l'offre.</p>
       </div>
 
-      <div style={{ padding: 20, borderRadius: 16, background: '#fff', border: `1px solid ${theme.primary}15`, display: 'grid', gap: 14 }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14 }}>
-          <div>
-            <label style={{ fontSize: '0.85rem', fontWeight: 700, display: 'block', marginBottom: 6 }}>Prénom *</label>
-            <input value={customer.firstName} onChange={(e) => upd('firstName', e.target.value)} className="rc-input" style={inputS(errors.firstName)} />
+      <div style={{ display: 'grid', gap: 14 }}>
+        {/* Section boutique + vendeur */}
+        <div style={{ padding: 20, borderRadius: 16, background: `linear-gradient(135deg, ${theme.primaryLight} 0%, #ffffff 100%)`, border: `1.5px solid ${theme.primary}30` }}>
+          <div style={{ fontSize: '0.82rem', fontWeight: 800, color: theme.primaryDark, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 6 }}>
+            🏪 Magasin et vendeur
           </div>
-          <div>
-            <label style={{ fontSize: '0.85rem', fontWeight: 700, display: 'block', marginBottom: 6 }}>Nom *</label>
-            <input value={customer.lastName} onChange={(e) => upd('lastName', e.target.value)} className="rc-input" style={inputS(errors.lastName)} />
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14 }}>
+            {/* Boutique */}
+            <div>
+              <label style={{ fontSize: '0.85rem', fontWeight: 700, display: 'block', marginBottom: 6, color: theme.text }}>
+                🏪 Boutique *
+              </label>
+              <div style={{ position: 'relative' }}>
+                <select value={customer.shop || ''} onChange={(e) => upd('shop', e.target.value)} style={{ ...selectS(errors.shop), color: customer.shop ? theme.text : '#94a3b8' }}>
+                  <option value="" disabled>Choisir la boutique…</option>
+                  {(shops || []).map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+              {errors.shop && <span style={{ color: '#dc2626', fontSize: '0.78rem', fontWeight: 600 }}>Requis</span>}
+            </div>
+            {/* Vendeur */}
+            <div>
+              <label style={{ fontSize: '0.85rem', fontWeight: 700, display: 'block', marginBottom: 6, color: theme.text }}>
+                👤 Vendeur *
+              </label>
+              <div style={{ position: 'relative' }}>
+                <select value={customer.seller || ''} onChange={(e) => upd('seller', e.target.value)} style={{ ...selectS(errors.seller), color: customer.seller ? theme.text : '#94a3b8' }}>
+                  <option value="" disabled>Choisir le vendeur…</option>
+                  {(sellers || []).map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+              {errors.seller && <span style={{ color: '#dc2626', fontSize: '0.78rem', fontWeight: 600 }}>Requis</span>}
+            </div>
           </div>
         </div>
-        <div>
-          <label style={{ fontSize: '0.85rem', fontWeight: 700, display: 'block', marginBottom: 6 }}><Phone size={13} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 4 }} /> Téléphone *</label>
-          <input value={customer.phone} onChange={(e) => upd('phone', e.target.value)} placeholder="06 12 34 56 78" className="rc-input" style={inputS(errors.phone)} />
+
+        {/* Section client */}
+        <div style={{ padding: 20, borderRadius: 16, background: '#fff', border: `1px solid ${theme.primary}15` }}>
+          <div style={{ fontSize: '0.82rem', fontWeight: 800, color: theme.primaryDark, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 6 }}>
+            👤 Coordonnées du client
+          </div>
+          <div style={{ display: 'grid', gap: 14 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14 }}>
+              <div>
+                <label style={{ fontSize: '0.85rem', fontWeight: 700, display: 'block', marginBottom: 6 }}>Prénom *</label>
+                <input value={customer.firstName} onChange={(e) => upd('firstName', e.target.value)} className="rc-input" style={inputS(errors.firstName)} />
+              </div>
+              <div>
+                <label style={{ fontSize: '0.85rem', fontWeight: 700, display: 'block', marginBottom: 6 }}>Nom *</label>
+                <input value={customer.lastName} onChange={(e) => upd('lastName', e.target.value)} className="rc-input" style={inputS(errors.lastName)} />
+              </div>
+            </div>
+            <div>
+              <label style={{ fontSize: '0.85rem', fontWeight: 700, display: 'block', marginBottom: 6 }}><Phone size={13} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 4 }} /> Téléphone *</label>
+              <input value={customer.phone} onChange={(e) => upd('phone', e.target.value)} placeholder="06 12 34 56 78" className="rc-input" style={inputS(errors.phone)} />
+            </div>
+            <div>
+              <label style={{ fontSize: '0.85rem', fontWeight: 700, display: 'block', marginBottom: 6 }}><Mail size={13} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 4 }} /> Email *</label>
+              <input value={customer.email} onChange={(e) => upd('email', e.target.value)} type="email" placeholder="client@exemple.fr" className="rc-input" style={inputS(errors.email)} />
+            </div>
+          </div>
         </div>
-        <div>
-          <label style={{ fontSize: '0.85rem', fontWeight: 700, display: 'block', marginBottom: 6 }}><Mail size={13} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 4 }} /> Email *</label>
-          <input value={customer.email} onChange={(e) => upd('email', e.target.value)} type="email" placeholder="client@exemple.fr" className="rc-input" style={inputS(errors.email)} />
-        </div>
+
         {Object.keys(errors).length > 0 && (
-          <p style={{ color: '#dc2626', fontSize: '0.85rem', margin: 0, fontWeight: 600 }}>Merci de remplir correctement tous les champs.</p>
+          <p style={{ color: '#dc2626', fontSize: '0.85rem', margin: 0, fontWeight: 600, textAlign: 'center' }}>Merci de remplir correctement tous les champs.</p>
         )}
-        <button className="rc-btn" onClick={submit} style={{ padding: '14px', borderRadius: 12, border: 'none', background: theme.primary, color: '#fff', fontWeight: 800, fontSize: '1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 4 }}>
+        <button className="rc-btn" onClick={submit} style={{ padding: '14px', borderRadius: 12, border: 'none', background: theme.primary, color: '#fff', fontWeight: 800, fontSize: '1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
           Confirmer et générer la fiche <ChevronRight size={18} />
         </button>
       </div>
@@ -1376,6 +1441,8 @@ function printInvoiceSheet({ theme, product, brand, storage, calc, evaluation, c
             <tr><td class="lbl">Nom</td><td class="val">${esc(customer?.lastName)}</td></tr>
             <tr><td class="lbl">Téléphone</td><td class="val">${esc(customer?.phone)}</td></tr>
             <tr><td class="lbl">Email</td><td class="val">${esc(customer?.email)}</td></tr>
+            ${customer?.shop ? `<tr><td class="lbl">Boutique</td><td class="val">${esc(customer.shop)}</td></tr>` : ''}
+            ${customer?.seller ? `<tr><td class="lbl">Vendeur</td><td class="val">${esc(customer.seller)}</td></tr>` : ''}
           </tbody></table>
         </div>
 
@@ -1736,18 +1803,17 @@ function HistoryLogin({ theme, onUnlock }) {
 }
 
 // ================== HISTORY VIEW (liste des estimations + recherche + réimpression) ==================
-function HistoryView({ theme, history, setHistory, products, brands, pricing, onLock }) {
+function HistoryView({ theme, history, setHistory, products, brands, pricing, shops, onLock }) {
   const [q, setQ] = useState('');
+  const [filterShop, setFilterShop] = useState('');
   const query = q.trim().toLowerCase();
 
-  // Tri par date desc (plus récent en haut)
   const sorted = [...history].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
-
-  // Filtre par nom/prénom/téléphone/mail/modèle
   const filtered = sorted.filter(e => {
+    if (filterShop && e.customer?.shop !== filterShop) return false;
     if (!query) return true;
     const c = e.customer || {};
-    const hay = [c.firstName, c.lastName, c.phone, c.email, e.product?.name].filter(Boolean).join(' ').toLowerCase();
+    const hay = [c.firstName, c.lastName, c.phone, c.email, e.product?.name, c.shop, c.seller].filter(Boolean).join(' ').toLowerCase();
     return hay.includes(query);
   });
 
@@ -1784,15 +1850,35 @@ function HistoryView({ theme, history, setHistory, products, brands, pricing, on
         </button>
       </div>
 
-      <div style={{ marginBottom: 16, position: 'relative' }}>
-        <Search size={16} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: theme.textMuted }} />
-        <input
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="Rechercher par nom, prénom, téléphone, email ou modèle..."
-          className="rc-input"
-          style={{ width: '100%', padding: '12px 14px 12px 38px', borderRadius: 10, border: `1.5px solid ${theme.primary}25`, background: '#fff', fontSize: '0.95rem', color: theme.text }}
-        />
+      <div style={{ display: 'flex', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
+        {/* Filtre par boutique */}
+        <div style={{ position: 'relative', minWidth: 180 }}>
+          <select
+            value={filterShop}
+            onChange={(e) => setFilterShop(e.target.value)}
+            style={{ width: '100%', padding: '11px 36px 11px 14px', borderRadius: 10, border: `1.5px solid ${theme.primary}25`, background: '#fff', fontSize: '0.92rem', color: filterShop ? theme.text : theme.textMuted, appearance: 'none', WebkitAppearance: 'none', cursor: 'pointer', backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 10px center' }}
+          >
+            <option value="">🏪 Toutes les boutiques</option>
+            {(shops || []).map(s => <option key={s} value={s}>🏪 {s}</option>)}
+          </select>
+        </div>
+        {/* Recherche texte */}
+        <div style={{ flex: 1, minWidth: 200, position: 'relative' }}>
+          <Search size={16} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: theme.textMuted }} />
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Nom, téléphone, email, modèle, vendeur..."
+            className="rc-input"
+            style={{ width: '100%', padding: '11px 14px 11px 38px', borderRadius: 10, border: `1.5px solid ${theme.primary}25`, background: '#fff', fontSize: '0.92rem', color: theme.text }}
+          />
+        </div>
+        {(filterShop || q) && (
+          <button onClick={() => { setFilterShop(''); setQ(''); }} className="rc-btn"
+            style={{ padding: '11px 14px', borderRadius: 10, border: `1.5px solid ${theme.primary}20`, background: '#fff', color: theme.textMuted, cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem', whiteSpace: 'nowrap' }}>
+            ✕ Effacer
+          </button>
+        )}
       </div>
 
       {filtered.length === 0 ? (
@@ -1818,6 +1904,8 @@ function HistoryView({ theme, history, setHistory, products, brands, pricing, on
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, fontSize: '0.85rem', color: theme.text, paddingTop: 6, borderTop: '1px solid #f1f5f9' }}>
                   <span><strong>{e.product?.name}</strong> ({e.storage})</span>
                   <span style={{ color: theme.textMuted }}>État : {condLabels[e.evaluation?.condition] || '—'}</span>
+                  {c.shop && <span style={{ color: theme.primary, fontWeight: 700, background: theme.primaryLight, padding: '2px 8px', borderRadius: 999, fontSize: '0.78rem' }}>🏪 {c.shop}</span>}
+                  {c.seller && <span style={{ color: theme.primaryDark, fontWeight: 600 }}>👤 {c.seller}</span>}
                   {c.phone && <span style={{ color: theme.textMuted }}><Phone size={11} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 3 }} />{c.phone}</span>}
                   {c.email && <span style={{ color: theme.textMuted }}><Mail size={11} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 3 }} />{c.email}</span>}
                 </div>
@@ -1881,7 +1969,7 @@ function DashboardLogin({ theme, onUnlock }) {
 }
 
 // ================== DASHBOARD ==================
-function Dashboard({ theme, setTheme, brands, setBrands, products, setProducts, pricing, setPricing, onLock }) {
+function Dashboard({ theme, setTheme, brands, setBrands, products, setProducts, pricing, setPricing, shops, setShops, sellers, setSellers, onLock }) {
   const [tab, setTab] = useState('appearance');
 
   const tabs = [
@@ -1890,6 +1978,7 @@ function Dashboard({ theme, setTheme, brands, setBrands, products, setProducts, 
     { id: 'products', label: 'Produits', icon: <Smartphone size={16} /> },
     { id: 'pricing', label: 'Formule de rachat', icon: <Settings size={16} /> },
     { id: 'brands', label: 'Marques', icon: <Sparkles size={16} /> },
+    { id: 'team', label: 'Boutiques & Équipe', icon: <User size={16} /> },
     { id: 'settings', label: 'Réglages', icon: <Lock size={16} /> },
   ];
 
@@ -1934,8 +2023,90 @@ function Dashboard({ theme, setTheme, brands, setBrands, products, setProducts, 
         {tab === 'products' && <ProductsTab theme={theme} brands={brands} products={products} setProducts={setProducts} />}
         {tab === 'pricing' && <PricingTab theme={theme} pricing={pricing} setPricing={setPricing} />}
         {tab === 'brands' && <BrandsTab theme={theme} brands={brands} setBrands={setBrands} />}
+        {tab === 'team' && <TeamTab theme={theme} shops={shops} setShops={setShops} sellers={sellers} setSellers={setSellers} />}
         {tab === 'settings' && <SettingsTab theme={theme} setTheme={setTheme} />}
       </div>
+    </div>
+  );
+}
+
+// --- Boutiques & Équipe ---
+function TeamTab({ theme, shops, setShops, sellers, setSellers }) {
+  const [newShop, setNewShop] = useState('');
+  const [newSeller, setNewSeller] = useState('');
+
+  const addShop = () => {
+    const v = newShop.trim();
+    if (!v || shops.includes(v)) { setNewShop(''); return; }
+    setShops([...shops, v]);
+    setNewShop('');
+  };
+  const removeShop = (s) => { if (window.confirm(`Supprimer la boutique "${s}" ?`)) setShops(shops.filter(x => x !== s)); };
+
+  const addSeller = () => {
+    const v = newSeller.trim();
+    if (!v || sellers.includes(v)) { setNewSeller(''); return; }
+    setSellers([...sellers, v]);
+    setNewSeller('');
+  };
+  const removeSeller = (s) => { if (window.confirm(`Supprimer le vendeur "${s}" ?`)) setSellers(sellers.filter(x => x !== s)); };
+
+  const ListItem = ({ value, onRemove }) => (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderRadius: 10, background: theme.surface, border: `1px solid ${theme.primary}10` }}>
+      <span style={{ flex: 1, fontWeight: 600, fontSize: '0.9rem' }}>{value}</span>
+      <button onClick={onRemove} className="rc-btn" title="Supprimer" style={{ width: 28, height: 28, borderRadius: 7, border: 'none', background: '#fef2f2', color: '#dc2626', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}>
+        <Trash2 size={13} />
+      </button>
+    </div>
+  );
+
+  return (
+    <div style={{ display: 'grid', gap: 16 }}>
+      {/* Boutiques */}
+      <Card theme={theme} title="🏪 Boutiques">
+        <p style={{ fontSize: '0.85rem', color: theme.textMuted, margin: '0 0 14px' }}>
+          Les boutiques disponibles dans le menu déroulant lors de la validation d'une reprise.
+        </p>
+        <div style={{ display: 'grid', gap: 8, marginBottom: 14 }}>
+          {shops.map(s => <ListItem key={s} value={s} onRemove={() => removeShop(s)} />)}
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <input
+            value={newShop}
+            onChange={(e) => setNewShop(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addShop(); } }}
+            placeholder="Nom de la nouvelle boutique…"
+            className="rc-input"
+            style={{ ...inputStyle(theme), flex: 1 }}
+          />
+          <button onClick={addShop} className="rc-btn" style={{ padding: '10px 18px', borderRadius: 10, border: 'none', background: theme.primary, color: '#fff', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap' }}>
+            <Plus size={15} /> Ajouter
+          </button>
+        </div>
+      </Card>
+
+      {/* Vendeurs */}
+      <Card theme={theme} title="👤 Vendeurs">
+        <p style={{ fontSize: '0.85rem', color: theme.textMuted, margin: '0 0 14px' }}>
+          Les vendeurs disponibles dans le menu déroulant lors de la validation d'une reprise.
+        </p>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 8, marginBottom: 14 }}>
+          {sellers.map(s => <ListItem key={s} value={s} onRemove={() => removeSeller(s)} />)}
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <input
+            value={newSeller}
+            onChange={(e) => setNewSeller(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addSeller(); } }}
+            placeholder="Prénom du vendeur…"
+            className="rc-input"
+            style={{ ...inputStyle(theme), flex: 1 }}
+          />
+          <button onClick={addSeller} className="rc-btn" style={{ padding: '10px 18px', borderRadius: 10, border: 'none', background: theme.primary, color: '#fff', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap' }}>
+            <Plus size={15} /> Ajouter
+          </button>
+        </div>
+      </Card>
     </div>
   );
 }
