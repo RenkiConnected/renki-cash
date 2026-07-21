@@ -635,7 +635,7 @@ export default function RenkiCash() {
       <main style={{ maxWidth: 1280, margin: '0 auto', padding: '24px 16px 80px' }}>
         {view === 'home' && <HomeView theme={theme} brands={brands} products={products} onSelectBrand={(b) => { setSelectedBrand(b); setView('brand'); }} searchQuery={searchQuery} filteredProducts={filteredProducts} onSelectProduct={(p) => { setSelectedBrand(brands.find(b => b.id === p.brand)); setSelectedProduct(p); setView('product'); }} />}
         {view === 'brand' && selectedBrand && <BrandView theme={theme} brand={selectedBrand} products={products.filter(p => p.brand === selectedBrand.id)} onSelectProduct={(p) => { setSelectedProduct(p); setView('product'); }} />}
-        {view === 'product' && selectedProduct && <ProductView theme={theme} product={selectedProduct} brand={brands.find(b => b.id === selectedProduct.brand)} selectedStorage={selectedStorage} setSelectedStorage={setSelectedStorage} competitorPrice={competitorPrice} setCompetitorPrice={setCompetitorPrice} evaluation={evaluation} setEvaluation={setEvaluation} pricing={pricing} evaluationComplete={evaluationComplete} currentCalc={currentCalc} onValidate={(boost) => {
+        {view === 'product' && selectedProduct && <ProductView theme={theme} product={selectedProduct} brand={brands.find(b => b.id === selectedProduct.brand)} selectedStorage={selectedStorage} setSelectedStorage={setSelectedStorage} competitorPrice={competitorPrice} setCompetitorPrice={setCompetitorPrice} evaluation={evaluation} setEvaluation={setEvaluation} pricing={pricing} evaluationComplete={evaluationComplete} currentCalc={currentCalc} history={history} onValidate={(boost) => {
           // Applique le boost reprise au prix final + à la revente conseillée
           const b = boost || 0;
           const finalized = b > 0
@@ -960,9 +960,16 @@ function ProductCard({ product, brand, theme, onClick, delay = 0 }) {
 }
 
 // ================== PRODUCT VIEW (formulaire d'évaluation) ==================
-function ProductView({ theme, product, brand, selectedStorage, setSelectedStorage, competitorPrice, setCompetitorPrice, evaluation, setEvaluation, pricing, evaluationComplete, currentCalc, onValidate, onBack }) {
+function ProductView({ theme, product, brand, selectedStorage, setSelectedStorage, competitorPrice, setCompetitorPrice, evaluation, setEvaluation, pricing, evaluationComplete, currentCalc, history, onValidate, onBack }) {
   const storageOptions = product.storage || [];
-  const [boost, setBoost] = useState(0); // bonus "Boost reprise" appliqué avant validation
+  const [boost, setBoost] = useState(0);
+  const [recentOpen, setRecentOpen] = useState(true); // ouvert par défaut
+
+  // 3 dernières estimations pour CE modèle, du plus récent au plus ancien
+  const recentEsts = (history || [])
+    .filter(e => e.product?.id === product.id)
+    .sort((a, b) => (b.date || '').localeCompare(a.date || ''))
+    .slice(0, 3);
   useEffect(() => {
     if (!selectedStorage && storageOptions[0]) setSelectedStorage(storageOptions[0]);
   }, [product]);
@@ -978,6 +985,108 @@ function ProductView({ theme, product, brand, selectedStorage, setSelectedStorag
       </button>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 20 }}>
+
+        {/* ===== BANDEAU DERNIÈRES ESTIMATIONS ===== */}
+        {recentEsts.length > 0 && (() => {
+          const condLabels = Object.fromEntries(getConditions(pricing).map(c => [c.key, c.label]));
+          const battLabels = { 'fonctionnelle': '✅', 'a-remplacer': '⚠️', 'non-fonctionnelle': '❌' };
+          const fmtDate = (iso) => {
+            try {
+              const d = new Date(iso);
+              const today = new Date();
+              const isToday = d.toDateString() === today.toDateString();
+              const dateStr = isToday ? "Aujourd'hui" : d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: '2-digit' });
+              const timeStr = d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+              return `${dateStr} à ${timeStr}`;
+            } catch { return iso; }
+          };
+          const last = recentEsts[0];
+          const lastDate = fmtDate(last.date);
+
+          return (
+            <div style={{ borderRadius: 14, overflow: 'hidden', border: `1.5px solid ${theme.primary}25`, background: '#fff' }}>
+              {/* Barre titre cliquable */}
+              <button
+                onClick={() => setRecentOpen(o => !o)}
+                className="rc-btn"
+                style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', border: 'none', background: theme.primaryLight, cursor: 'pointer', textAlign: 'left' }}
+              >
+                <span style={{ fontSize: '1rem' }}>🕐</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <span style={{ fontWeight: 800, fontSize: '0.88rem', color: theme.primaryDark }}>
+                    {recentEsts.length} estimation{recentEsts.length > 1 ? 's' : ''} récente{recentEsts.length > 1 ? 's' : ''} sur ce modèle
+                  </span>
+                  {!recentOpen && (
+                    <span style={{ fontSize: '0.8rem', color: theme.textMuted, marginLeft: 10 }}>
+                      Dernière : <strong>{last.calc?.price + (last.calc?.boost || 0)} €</strong> — {lastDate}
+                    </span>
+                  )}
+                </div>
+                <ChevronDown size={16} style={{ color: theme.primary, flexShrink: 0, transform: recentOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+              </button>
+
+              {/* Contenu déroulant */}
+              {recentOpen && (
+                <div style={{ padding: '12px 16px', display: 'grid', gap: 8 }}>
+                  {recentEsts.map((e, i) => {
+                    const price = (e.calc?.price || 0);
+                    const boost = e.calc?.boost || 0;
+                    const total = price;
+                    return (
+                      <div key={e.id} style={{
+                        display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8,
+                        padding: '10px 14px', borderRadius: 10,
+                        background: i === 0 ? theme.primaryLight : theme.surface,
+                        border: `1px solid ${i === 0 ? theme.primary + '30' : theme.primary + '10'}`,
+                      }}>
+                        {/* Prix */}
+                        <div style={{ fontWeight: 800, fontSize: '1.1rem', color: theme.primaryDark, fontFamily: 'Manrope, sans-serif', minWidth: 70 }}>
+                          {total} €
+                          {boost > 0 && <span style={{ fontSize: '0.72rem', fontWeight: 600, color: theme.primary, marginLeft: 4 }}>+{boost}€ boost</span>}
+                        </div>
+                        {/* Capacité */}
+                        {e.storage && (
+                          <span style={{ fontSize: '0.78rem', fontWeight: 700, padding: '3px 9px', borderRadius: 999, background: '#fff', border: `1px solid ${theme.primary}20`, color: theme.text }}>
+                            {e.storage}
+                          </span>
+                        )}
+                        {/* État */}
+                        {e.evaluation?.condition && (
+                          <span style={{ fontSize: '0.78rem', color: theme.textMuted }}>
+                            {condLabels[e.evaluation.condition] || e.evaluation.condition}
+                          </span>
+                        )}
+                        {/* Batterie */}
+                        {e.evaluation?.battery && (
+                          <span title={`Batterie : ${e.evaluation.battery}`} style={{ fontSize: '0.85rem' }}>
+                            {battLabels[e.evaluation.battery] || ''}
+                          </span>
+                        )}
+                        {/* Facture */}
+                        {e.evaluation?.invoice === 'oui' && (
+                          <span style={{ fontSize: '0.72rem', padding: '2px 8px', borderRadius: 999, background: '#dcfce7', color: '#15803d', fontWeight: 700 }}>Facture ✓</span>
+                        )}
+                        {/* Boutique / vendeur */}
+                        {e.customer?.shop && (
+                          <span style={{ fontSize: '0.75rem', color: theme.textMuted, marginLeft: 'auto' }}>🏪 {e.customer.shop}</span>
+                        )}
+                        {e.customer?.seller && (
+                          <span style={{ fontSize: '0.75rem', color: theme.textMuted }}>👤 {e.customer.seller}</span>
+                        )}
+                        {/* Date */}
+                        <span style={{ fontSize: '0.72rem', color: theme.textMuted, whiteSpace: 'nowrap', marginLeft: e.customer?.shop ? 0 : 'auto' }}>
+                          {i === 0 && <strong style={{ color: theme.primary }}>↑ Dernière — </strong>}
+                          {fmtDate(e.date)}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
         {/* Header produit */}
         <div style={{ display: 'flex', gap: 16, alignItems: 'center', padding: 18, borderRadius: 18, background: theme.surface, border: `1px solid ${theme.primary}15` }}>
           <div style={{ width: 96, height: 96, borderRadius: 14, background: `linear-gradient(135deg, ${theme.primaryLight} 0%, #fff 100%)`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
