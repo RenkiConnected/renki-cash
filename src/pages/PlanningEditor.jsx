@@ -1,0 +1,2320 @@
+import React, { useState, useRef, useCallback } from 'react';
+import { useApp } from '../context/AppContext';
+
+const BREAKS=[{v:0,l:'Pas de pause'},{v:.5,l:'30 min'},{v:1,l:'1h'},{v:1.5,l:'1h30'},{v:2,l:'2h'}];
+const DAY_NAMES=['Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi','Dimanche'];
+
+function calcH(s,e,b){
+  try{
+    const[sh,sm]=s.split(':').map(Number),[eh,em]=e.split(':').map(Number);
+    const d=(eh*60+em)-(sh*60+sm); // duration in minutes
+    if(d<=0) return 0;
+    const worked=d-Math.round((b||0)*60); // subtract break (in minutes) to stay exact
+    return Math.max(0, parseFloat((worked/60).toFixed(2)));
+  }catch{return 0;}
+}
+
+// Round minutes to nearest 15min slot (clean times: :00, :15, :30, :45)
+function roundTo15(mins) {
+  return Math.round(mins / 15) * 15;
+}
+// Round minutes to nearest 30min slot (clean times: :00, :30 only)
+function roundTo30(mins) {
+  return Math.round(mins / 30) * 30;
+}
+
+// Format mins to HH:MM
+function minsToTime(mins) {
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+}
+function addMinutes(time,mins){
+  const[h,m]=time.split(':').map(Number);
+  const total=h*60+m+mins;
+  return `${String(Math.floor(total/60)).padStart(2,'0')}:${String(total%60).padStart(2,'0')}`;
+}
+function getMeta(types,id){ return types.find(t=>t.id===id)||{label:id,color:'#6366F1',bgColor:'#EEF2FF'}; }
+// Format decimal hours to human "7h20" / "7h" / "7h30" format (clearer than 7.33h)
+function fmtH(decimalHours){
+  if(decimalHours==null||isNaN(decimalHours)) return '0h';
+  const totalMin=Math.round(decimalHours*60);
+  const h=Math.floor(totalMin/60);
+  const m=totalMin%60;
+  return m===0 ? `${h}h` : `${h}h${String(m).padStart(2,'0')}`;
+}
+
+// SINGLE SOURCE OF TRUTH for a shift's hours.
+// ALWAYS recomputes from start/end times minus break, NEVER trusts stored 'hours'.
+// This guarantees displayed hours always match displayed times, even for old data.
+function shiftHours(sh){
+  if(!sh) return 0;
+  let total=0;
+  if(sh.startTime && sh.endTime){
+    total += calcH(sh.startTime, sh.endTime, sh.breakH||0);
+  }
+  if(sh.split && sh.split.startTime && sh.split.endTime){
+    total += calcH(sh.split.startTime, sh.split.endTime, sh.split.breakH||0);
+  }
+  return parseFloat(total.toFixed(2));
+}
+// Hours for just the main part (not split) - for per-part display
+function mainHours(sh){
+  if(!sh||!sh.startTime||!sh.endTime) return 0;
+  return calcH(sh.startTime, sh.endTime, sh.breakH||0);
+}
+function splitHours(sh){
+  if(!sh||!sh.split||!sh.split.startTime||!sh.split.endTime) return 0;
+  return calcH(sh.split.startTime, sh.split.endTime, sh.split.breakH||0);
+}
+/* ── SHIFT DETAIL POPUP — desktop + mobile, animated ─────── */
+function ShiftDetailPopup({emp,day,shift,onClose,types,onEdit}){
+  if(!shift) return null;
+  const st=getMeta(types,shift.type);
+  const st2=shift.split?getMeta(types,shift.split.type):null;
+  const isMob=window.innerWidth<=860;
+
+  // Centered card, capped to viewport, fully scrollable on both mobile and desktop
+  const overlayStyle=isMob?{
+    position:'fixed',inset:0,background:'rgba(27,42,59,.55)',
+    backdropFilter:'blur(8px)',zIndex:400,
+    display:'flex',alignItems:'center',justifyContent:'center',
+    padding:'10px',overflowY:'auto',
+  }:{
+    position:'fixed',inset:0,background:'rgba(27,42,59,.45)',
+    backdropFilter:'blur(8px)',zIndex:400,
+    display:'flex',alignItems:'center',justifyContent:'center',
+    padding:'16px',
+  };
+
+  const cardStyle=isMob?{
+    background:'#fff',borderRadius:18,
+    width:'100%',maxWidth:520,margin:'auto',
+    padding:'22px 20px 28px',
+    maxHeight:'88dvh',overflowY:'auto',WebkitOverflowScrolling:'touch',
+    boxShadow:'0 24px 80px rgba(0,0,0,.25)',
+    animation:'popIn .25s cubic-bezier(.34,1.56,.64,1) forwards',
+  }:{
+    background:'#fff',borderRadius:22,
+    width:'100%',maxWidth:520,
+    padding:'28px 34px',
+    maxHeight:'calc(100vh - 32px)',overflowY:'auto',
+    boxShadow:'0 24px 80px rgba(0,0,0,.22)',
+    animation:'popIn .25s cubic-bezier(.34,1.56,.64,1) forwards',
+  };
+
+  return(
+    <div style={overlayStyle} onClick={onClose}>
+      <div style={cardStyle} onClick={e=>e.stopPropagation()}>
+        {/* Handle (mobile only) */}
+        {isMob&&<div style={{width:38,height:4,background:'#E2EBF0',borderRadius:2,margin:'12px auto 20px'}}/>}
+
+        {/* Header: day info */}
+        <div style={{
+          background:`linear-gradient(135deg,${st.bgColor},${st.bgColor}cc)`,
+          borderRadius:14,padding:'14px 16px',marginBottom:16,
+          border:`1.5px solid ${st.color}30`,
+          display:'flex',alignItems:'center',justifyContent:'space-between',
+        }}>
+          <div>
+            <div style={{fontSize:13,fontWeight:700,color:st.color,textTransform:'capitalize',letterSpacing:'.04em'}}>
+              {day.day}
+            </div>
+            <div style={{fontSize:20,fontWeight:800,color:'var(--text)',marginTop:2}}>
+              {day.date.toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'})}
+            </div>
+          </div>
+          <button onClick={onClose} style={{background:'rgba(0,0,0,.06)',border:'none',borderRadius:50,width:32,height:32,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',fontSize:16,color:'var(--muted)'}}>✕</button>
+        </div>
+
+        {/* Employee */}
+        <div style={{display:'flex',alignItems:'center',gap:13,marginBottom:18,padding:'12px 14px',background:'var(--card2)',borderRadius:12,border:'1px solid var(--border)'}}>
+          <div style={{width:46,height:46,borderRadius:'50%',background:emp.color||'var(--teal)',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:800,color:'#fff',fontSize:19,flexShrink:0,boxShadow:`0 4px 12px ${emp.color||'var(--teal)'}55`}}>
+            {emp.name[0]}
+          </div>
+          <div>
+            <div style={{fontWeight:800,fontSize:17,color:'var(--text)'}}>{emp.name}</div>
+            <div style={{fontSize:12,color:'var(--muted)',marginTop:2,textTransform:'capitalize'}}>{emp.role} · {emp.contractHours}h/sem</div>
+          </div>
+        </div>
+
+        {/* Main shift block */}
+        <div style={{background:st.bgColor,border:`2px solid ${st.color}40`,borderRadius:16,padding:'18px 20px',marginBottom:st2?10:18}}>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}>
+            <div style={{display:'flex',alignItems:'center',gap:8}}>
+              <div style={{width:10,height:10,borderRadius:'50%',background:st.color}}/>
+              <span style={{fontWeight:800,fontSize:19,color:st.color}}>{st.label}</span>
+            </div>
+            {(shift.hours||0)>0&&(
+              <div style={{background:st.color,color:'#fff',borderRadius:20,padding:'5px 14px',fontWeight:800,fontSize:18}}>
+                {fmtH(mainHours(shift))}
+              </div>
+            )}
+          </div>
+          {shift.startTime?(
+            <div style={{display:'flex',alignItems:'center',gap:0,background:'rgba(255,255,255,.6)',borderRadius:10,padding:'10px 14px'}}>
+              <div style={{textAlign:'center',flex:1}}>
+                <div style={{fontSize:11,fontWeight:700,color:st.color,opacity:.7,textTransform:'uppercase',letterSpacing:'.06em'}}>Début</div>
+                <div className="num" style={{fontSize:30,fontWeight:800,color:st.color}}>{shift.startTime}</div>
+              </div>
+              <div style={{fontSize:22,color:st.color,opacity:.4,padding:'0 8px'}}>→</div>
+              <div style={{textAlign:'center',flex:1}}>
+                <div style={{fontSize:11,fontWeight:700,color:st.color,opacity:.7,textTransform:'uppercase',letterSpacing:'.06em'}}>Fin</div>
+                <div className="num" style={{fontSize:30,fontWeight:800,color:st.color}}>{shift.endTime}</div>
+              </div>
+              {(shift.breakH||0)>0&&(
+                <div style={{textAlign:'center',flex:1,borderLeft:`1px solid ${st.color}25`,paddingLeft:8}}>
+                  <div style={{fontSize:11,fontWeight:700,color:st.color,opacity:.7,textTransform:'uppercase',letterSpacing:'.06em'}}>Pause</div>
+                  <div style={{fontSize:20,fontWeight:800,color:st.color}}>{shift.breakH}h</div>
+                </div>
+              )}
+            </div>
+          ):(
+            <div style={{textAlign:'center',padding:'6px 0',fontSize:15,color:st.color,fontWeight:600,opacity:.8}}>Journée complète</div>
+          )}
+          {shift.note&&<div style={{marginTop:10,fontSize:13,color:st.color,opacity:.75,fontStyle:'italic',display:'flex',gap:6,alignItems:'center'}}>
+            <span>💬</span>{shift.note}
+          </div>}
+          {shift.depannage&&<div style={{marginTop:8,fontSize:12,background:'#FFF7E0',color:'#D05B00',borderRadius:7,padding:'4px 10px',display:'inline-block',fontWeight:700}}>⚡ Dépannage</div>}
+          {shift.latenessMin>0&&<div style={{marginTop:8,fontSize:12,background:'#FFF0F2',color:'#C8002B',borderRadius:7,padding:'4px 10px',display:'inline-block',fontWeight:700}}>⏰ {shift.latenessMin} min de retard</div>}
+        </div>
+
+        {/* Split shift */}
+        {st2&&shift.split&&(
+          <div style={{background:st2.bgColor,border:`2px solid ${st2.color}40`,borderRadius:16,padding:'18px 20px',marginBottom:18}}>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}>
+              <div style={{display:'flex',alignItems:'center',gap:8}}>
+                <div style={{width:10,height:10,borderRadius:'50%',background:st2.color}}/>
+                <span style={{fontWeight:800,fontSize:19,color:st2.color}}>{st2.label}</span>
+              </div>
+              {(shift.split.hours||0)>0&&(
+                <div style={{background:st2.color,color:'#fff',borderRadius:20,padding:'5px 14px',fontWeight:800,fontSize:18}}>
+                  {shift.split.hours}h
+                </div>
+              )}
+            </div>
+            {shift.split.startTime&&(
+              <div style={{display:'flex',alignItems:'center',gap:0,background:'rgba(255,255,255,.6)',borderRadius:10,padding:'10px 14px'}}>
+                <div style={{textAlign:'center',flex:1}}>
+                  <div style={{fontSize:11,fontWeight:700,color:st2.color,opacity:.7,textTransform:'uppercase',letterSpacing:'.06em'}}>Début</div>
+                  <div className="num" style={{fontSize:30,fontWeight:800,color:st2.color}}>{shift.split.startTime}</div>
+                </div>
+                <div style={{fontSize:22,color:st2.color,opacity:.4,padding:'0 8px'}}>→</div>
+                <div style={{textAlign:'center',flex:1}}>
+                  <div style={{fontSize:11,fontWeight:700,color:st2.color,opacity:.7,textTransform:'uppercase',letterSpacing:'.06em'}}>Fin</div>
+                  <div className="num" style={{fontSize:30,fontWeight:800,color:st2.color}}>{shift.split.endTime}</div>
+                </div>
+              </div>
+            )}
+            {shift.split.note&&<div style={{marginTop:10,fontSize:13,color:st2.color,opacity:.75,fontStyle:'italic',display:'flex',gap:6,alignItems:'center'}}>
+              <span>💬</span>{shift.split.note}
+            </div>}
+          </div>
+        )}
+
+        {/* Actions */}
+        <div style={{display:'flex',gap:10}}>
+          <button className="btn btn-primary" style={{flex:1,justifyContent:'center',padding:'14px',fontSize:16,borderRadius:12,fontWeight:700}}
+            onClick={onEdit}>
+            ✏️ Modifier
+          </button>
+          <button className="btn btn-ghost" style={{padding:'14px 20px',fontSize:16,borderRadius:12}} onClick={onClose}>
+            Fermer
+          </button>
+        </div>
+      </div>
+
+      <style>{`
+        @keyframes slideUp {
+          from { transform: translateY(100%); opacity:0; }
+          to   { transform: translateY(0);    opacity:1; }
+        }
+        @keyframes popIn {
+          from { transform: scale(.88) translateY(12px); opacity:0; }
+          to   { transform: scale(1)   translateY(0);    opacity:1; }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+
+
+/* ── SHIFT MODAL WITH SPLIT-DAY ────────────────────────────── */
+function ShiftModal({emp,dayIdx,day,shift,onSave,onDelete,onClose,types,allStores,activeStoreId}){
+  const[splitMode,setSplitMode]=useState(!!(shift?.split));
+  // Target store (déplacement): default to where the shift currently lives
+  const initialTarget = (shift && shift._away && shift._awayStoreId) ? shift._awayStoreId : activeStoreId;
+  const[targetStore,setTargetStore]=useState(initialTarget);
+  // Main/AM slot
+  const[type,setType]=useState(shift?.type||'work');
+  const[s,setS]=useState(shift?.startTime||'09:00');
+  const[e,setE]=useState(shift?.endTime||'13:30');
+  const[brk,setBrk]=useState(shift?.breakH!=null?shift.breakH:1);
+  const[note,setNote]=useState(shift?.note||'');
+  const[dep,setDep]=useState(shift?.depannage||false);
+  const[lateness,setLateness]=useState(shift?.latenessMin!=null?String(shift.latenessMin):'');
+  // PM slot (split)
+  const[type2,setType2]=useState(shift?.split?.type||'meeting');
+  const[s2,setS2]=useState(shift?.split?.startTime||'14:00');
+  const[e2,setE2]=useState(shift?.split?.endTime||'19:00');
+  const[brk2,setBrk2]=useState(shift?.split?.breakH!=null?shift.split.breakH:0);
+  const[note2,setNote2]=useState(shift?.split?.note||'');
+
+  const needsT=['work','communication','meeting','school'].includes(type);
+  const needsT2=['work','communication','meeting','school'].includes(type2);
+  const h1=needsT?calcH(s,e,brk):0;
+  const h2=needsT2?calcH(s2,e2,brk2):0;
+  const totalH=parseFloat((h1+h2).toFixed(2));
+
+  const handleSave=()=>{
+    const data={
+      type,
+      startTime:needsT?s:null,
+      endTime:needsT?e:null,
+      breakH:needsT?brk:0,
+      hours:needsT?parseFloat(h1.toFixed(2)):null,
+      note,
+      depannage:dep,
+      latenessMin: lateness!=='' && !isNaN(Number(lateness)) ? Number(lateness) : null,
+      split:splitMode?{
+        type:type2,
+        startTime:needsT2?s2:null,
+        endTime:needsT2?e2:null,
+        breakH:needsT2?brk2:0,
+        hours:needsT2?parseFloat(h2.toFixed(2)):null,
+        note:note2,
+      }:null,
+    };
+    onSave(data, targetStore);
+  };
+
+  return(
+    <div className="overlay" onClick={onClose}>
+      <div className="modal" style={{maxWidth:780}} onClick={ev=>ev.stopPropagation()}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:22,paddingBottom:18,borderBottom:'1.5px solid var(--border)'}}>
+          <div>
+            <h3 style={{fontFamily:'var(--font-h)',fontWeight:800,fontSize:23}}>✏️ Modifier le créneau</h3>
+            <p style={{color:'var(--muted)',fontSize:15,marginTop:5}}><b style={{color:'var(--text)'}}>{emp.name}</b> · {day.day} {day.date.toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'})}</p>
+          </div>
+          <button className="btn btn-ghost btn-xs" onClick={onClose}>✕</button>
+        </div>
+
+        {/* Affectation magasin (déplacement) */}
+        {allStores && allStores.length>1 && (
+          <div style={{background: targetStore!==activeStoreId?'#FFF3E0':'var(--card2)', border:`1.5px solid ${targetStore!==activeStoreId?'#F5B764':'var(--border)'}`, borderRadius:12, padding:'12px 14px', marginBottom:18}}>
+            <div style={{fontSize:13,fontWeight:700,color:targetStore!==activeStoreId?'#B05A00':'var(--muted)',marginBottom:7,display:'flex',alignItems:'center',gap:6}}>
+              ✈ Affecter ce créneau à un magasin
+            </div>
+            <select className="inp" value={targetStore} onChange={ev=>setTargetStore(ev.target.value)} style={{fontSize:15,padding:'10px 12px',cursor:'pointer'}}>
+              {allStores.map(st=>(
+                <option key={st.id} value={st.id}>{st.id===activeStoreId?`${st.name} (magasin actuel)`:`Déplacement → ${st.name}`}</option>
+              ))}
+            </select>
+            {targetStore!==activeStoreId && (
+              <div style={{fontSize:12.5,color:'#B05A00',marginTop:7,lineHeight:1.4}}>
+                {emp.name} sera affiché en déplacement sur ce créneau. Il apparaîtra dans le planning de <strong>{allStores.find(s=>s.id===targetStore)?.name}</strong> et marqué « ✈ » sur sa boutique d'origine.
+              </div>
+            )}
+          </div>
+        )}
+        <div style={{display:'flex',background:'var(--card2)',borderRadius:10,padding:3,marginBottom:18,border:'1px solid var(--border)'}}>
+          <button onClick={()=>setSplitMode(false)} style={{
+            flex:1,padding:'9px',borderRadius:8,border:'none',cursor:'pointer',
+            background:!splitMode?'white':'transparent',
+            color:!splitMode?'var(--text)':'var(--muted)',
+            fontFamily:'var(--font-b)',fontSize:13,fontWeight:!splitMode?700:500,
+            boxShadow:!splitMode?'var(--shadow)':'none',transition:'all .15s',
+          }}>🕐 Journée simple</button>
+          <button onClick={()=>setSplitMode(true)} style={{
+            flex:1,padding:'9px',borderRadius:8,border:'none',cursor:'pointer',
+            background:splitMode?'white':'transparent',
+            color:splitMode?'var(--text)':'var(--muted)',
+            fontFamily:'var(--font-b)',fontSize:13,fontWeight:splitMode?700:500,
+            boxShadow:splitMode?'var(--shadow)':'none',transition:'all .15s',
+          }}>✂️ Journée coupée (matin/après-midi)</button>
+        </div>
+
+        {/* SLOT 1 */}
+        <div style={{background:splitMode?'#EBF8FF':'transparent',borderRadius:splitMode?12:0,padding:splitMode?'14px':0,border:splitMode?'1px solid #B3E0FF':'none',marginBottom:splitMode?12:0}}>
+          {splitMode&&<div className="lbl" style={{color:'#1D6FD8',marginBottom:10}}>🌅 Matin</div>}
+          <div style={{marginBottom:12}}>
+            <div className="lbl">{splitMode?'Type matin':'Type'}</div>
+            <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
+              {types.map(st=>(
+                <button key={st.id} onClick={()=>setType(st.id)} style={{
+                  padding:'7px 13px',borderRadius:30,cursor:'pointer',
+                  border:`2px solid ${type===st.id?st.color:st.color+'40'}`,
+                  background:type===st.id?st.bgColor:'#fff',
+                  color:st.color,fontWeight:type===st.id?700:500,fontSize:12,fontFamily:'var(--font-b)',
+                }}>{st.label}</button>
+              ))}
+            </div>
+          </div>
+          {needsT&&<>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:10,marginBottom:10}}>
+              <div><div className="lbl">Début</div><input className="inp" type="time" value={s} onChange={ev=>setS(ev.target.value)}/></div>
+              <div><div className="lbl">Fin</div><input className="inp" type="time" value={e} onChange={ev=>setE(ev.target.value)}/></div>
+              <div>
+                <div className="lbl">Pause</div>
+                <select className="inp" value={brk} onChange={ev=>setBrk(parseFloat(ev.target.value))}>
+                  {BREAKS.map(b=><option key={b.v} value={b.v}>{b.l}</option>)}
+                </select>
+              </div>
+            </div>
+            {h1>0&&<div style={{background:'var(--teal-light)',borderRadius:10,padding:'12px 16px',marginBottom:12,fontSize:16,color:'var(--teal-dark)',fontWeight:700,border:'1.5px solid var(--teal-mid)'}}>⏱ {fmtH(h1)}</div>}
+          </>}
+          <div style={{marginBottom:4}}><div className="lbl">Note</div><input className="inp" type="text" placeholder="Remarque..." value={note} onChange={ev=>setNote(ev.target.value)}/></div>
+        </div>
+
+        {/* SLOT 2 (split mode) */}
+        {splitMode&&(
+          <div style={{background:'#FFF3E0',borderRadius:12,padding:'14px',border:'1px solid #FFCC80',marginBottom:14}}>
+            <div className="lbl" style={{color:'#D05B00',marginBottom:10}}>🌆 Après-midi</div>
+            <div style={{marginBottom:10}}>
+              <div className="lbl">Type après-midi</div>
+              <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
+                {types.map(st=>(
+                  <button key={st.id} onClick={()=>setType2(st.id)} style={{
+                    padding:'7px 13px',borderRadius:30,cursor:'pointer',
+                    border:`2px solid ${type2===st.id?st.color:st.color+'40'}`,
+                    background:type2===st.id?st.bgColor:'#fff',
+                    color:st.color,fontWeight:type2===st.id?700:500,fontSize:12,fontFamily:'var(--font-b)',
+                  }}>{st.label}</button>
+                ))}
+              </div>
+            </div>
+            {needsT2&&<>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:10,marginBottom:8}}>
+                <div><div className="lbl">Début</div><input className="inp" type="time" value={s2} onChange={ev=>setS2(ev.target.value)}/></div>
+                <div><div className="lbl">Fin</div><input className="inp" type="time" value={e2} onChange={ev=>setE2(ev.target.value)}/></div>
+                <div>
+                  <div className="lbl">Pause</div>
+                  <select className="inp" value={brk2} onChange={ev=>setBrk2(parseFloat(ev.target.value))}>
+                    {BREAKS.map(b=><option key={b.v} value={b.v}>{b.l}</option>)}
+                  </select>
+                </div>
+              </div>
+              {h2>0&&<div style={{background:'rgba(208,91,0,.08)',borderRadius:8,padding:'7px 12px',marginBottom:8,fontSize:13,color:'#D05B00',fontWeight:600}}>⏱ {fmtH(h2)}</div>}
+            </>}
+            <div><div className="lbl">Note</div><input className="inp" type="text" placeholder="Remarque..." value={note2} onChange={ev=>setNote2(ev.target.value)}/></div>
+          </div>
+        )}
+
+        {/* Total */}
+        {splitMode&&totalH>0&&(
+          <div style={{background:'var(--teal-light)',border:'1.5px solid var(--teal-mid)',borderRadius:10,padding:'10px 14px',marginBottom:14,display:'flex',gap:10,alignItems:'center'}}>
+            <span>⏱</span>
+            <span style={{color:'var(--teal-dark)',fontWeight:700,fontSize:15}}>Total journée : {totalH}h</span>
+          </div>
+        )}
+
+        {!splitMode&&(
+          <label style={{display:'flex',alignItems:'center',gap:10,marginTop:12,marginBottom:18,cursor:'pointer',fontSize:14,color:'var(--muted)'}}>
+            <input type="checkbox" checked={dep} onChange={ev=>setDep(ev.target.checked)} style={{accentColor:'var(--teal)',width:16,height:16}}/>
+            Dépannage (autre magasin)
+          </label>
+        )}
+
+        {needsT&&(
+          <div style={{marginTop:12,marginBottom:18,background:'#FFF0F2',border:'1.5px solid #F5B5C0',borderRadius:12,padding:'12px 14px'}}>
+            <label style={{fontSize:13.5,fontWeight:700,color:'#C8002B',marginBottom:7,display:'block'}}>⏰ Retard ce jour (minutes)</label>
+            <input className="inp" type="number" min="0" step="1" value={lateness} onChange={ev=>setLateness(ev.target.value)} placeholder="0" style={{fontSize:15,padding:'9px 12px',width:130,textAlign:'center',fontWeight:700,color:'#C8002B'}}/>
+            <div style={{fontSize:12,color:'#A03048',marginTop:6}}>Apparaîtra dans le récap des primes (total du mois par personne).</div>
+          </div>
+        )}
+
+        <div style={{display:'flex',gap:10}}>
+          <button className="btn btn-primary" style={{flex:1,justifyContent:'center',padding:'13px'}} onClick={handleSave}>
+            ✓ Enregistrer
+          </button>
+          {shift&&<button className="btn btn-danger" onClick={onDelete}>🗑</button>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── AUTO-GENERATE MODAL ──────────────────────────────────── */
+function AutoModal({store,emps,allEmployees,manageableStores,weekDates,currentWeek,currentYear,leaveRequests,onGenerate,onClose}){
+  const[openStart,setOpenStart]=useState(store.openTime||'09:00');
+  const[openEnd,setOpenEnd]=useState(store.closeTime||'19:30');
+  const hasLunch=!!(store.lunchBreak&&store.lunchStart&&store.lunchEnd);
+  const[brk,setBrk]=useState(1);
+
+  // Présence: which employees are present this week (home emps checked by default)
+  const[present,setPresent]=useState(()=>{ const s={}; emps.forEach(e=>{s[e.id]=true;}); return s; });
+  // Renforts: vendeurs from OTHER managed stores added this week
+  const[renforts,setRenforts]=useState([]); // array of emp ids
+  const[showRenfortPicker,setShowRenfortPicker]=useState(false);
+
+  // Candidate renforts: vendeurs/managers from other managed stores not already in emps
+  const renfortCandidates=(allEmployees||[]).filter(e=>
+    e.storeId!==store.id &&
+    !emps.find(x=>x.id===e.id) &&
+    (
+      // From a store this manager manages, OR a floating vendeur (usable anywhere)
+      (manageableStores||[]).some(s=>s.id===e.storeId) ||
+      (e.isFloating && e.role==='vendeur')
+    )
+  );
+  const renfortEmps=renfortCandidates.filter(e=>renforts.includes(e.id));
+  // Full list shown = home emps + chosen renforts
+  const displayEmps=[...emps, ...renfortEmps];
+  // Jours fériés sélectionnés pour cette semaine (indices 0=Lun..6=Dim)
+  const [holidayDays, setHolidayDays] = useState([]);
+
+  const openH=parseFloat(calcH(openStart,openEnd,brk).toFixed(2)); // full day span
+  
+  // Show approved leaves for this week for each emp
+  const getEmpLeaves=(empId)=>{
+    const leaves=[];
+    leaveRequests.filter(r=>r.employeeId===empId&&r.status==='approved').forEach(req=>{
+      req.weeks?.forEach(we=>{
+        if(we.week===currentWeek&&we.year===currentYear){
+          we.days.forEach(di=>leaves.push(di));
+        }
+      });
+    });
+    return leaves;
+  };
+
+  return(
+    <div className="overlay" onClick={onClose}>
+      <div className="modal" style={{maxWidth:740}} onClick={ev=>ev.stopPropagation()}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:10}}>
+          <div>
+            <h3 style={{fontFamily:'var(--font-h)',fontWeight:800,fontSize:20}}>⚡ Génération automatique</h3>
+            <p style={{color:'var(--muted)',fontSize:14,marginTop:3}}>{store.name} · S{currentWeek}</p>
+          </div>
+          <button className="btn btn-ghost btn-xs" onClick={onClose}>✕</button>
+        </div>
+
+        {/* Info */}
+        <div style={{background:'var(--teal-light)',border:'1.5px solid var(--teal-mid)',borderRadius:10,padding:'10px 14px',marginBottom:10,fontSize:13,color:'var(--teal-dark)',lineHeight:1.5}}>
+          ✅ Les <strong>congés approuvés</strong> sont intégrés automatiquement<br/>
+          ✅ Les heures hebdomadaires de <strong>chaque contrat</strong> sont respectées<br/>
+          ✅ Les employés alternent <strong>ouverture / fermeture</strong>
+        </div>
+
+        {/* Horaires magasin */}
+        <div style={{marginBottom:10}}>
+          <div className="lbl">Horaires d'ouverture du magasin</div>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+            <div>
+              <div className="lbl" style={{fontSize:10}}>Ouverture</div>
+              <input className="inp" type="time" value={openStart} onChange={e=>setOpenStart(e.target.value)}/>
+            </div>
+            <div>
+              <div className="lbl" style={{fontSize:10}}>Fermeture</div>
+              <input className="inp" type="time" value={openEnd} onChange={e=>setOpenEnd(e.target.value)}/>
+            </div>
+          </div>
+          {openH>0&&<div style={{marginTop:6,fontSize:14,color:'var(--teal-dark)',fontWeight:700,padding:'8px 12px',background:'white',borderRadius:9,border:'1px solid var(--teal-mid)'}}>📏 Amplitude : {openH}h ({openStart} → {openEnd})</div>}
+        </div>
+
+        {/* Pause */}
+        <div style={{marginBottom:10}}>
+          <div className="lbl">Pause déjeuner</div>
+          <div style={{display:'flex',gap:8}}>
+            {BREAKS.map(b=>(
+              <button key={b.v} onClick={()=>setBrk(b.v)} style={{
+                flex:1,padding:'10px 8px',borderRadius:10,cursor:'pointer',
+                border:`2px solid ${brk===b.v?'var(--teal)':'var(--border)'}`,
+                background:brk===b.v?'var(--teal-light)':'#fff',
+                color:brk===b.v?'var(--teal-dark)':'var(--muted)',
+                fontWeight:brk===b.v?700:500,fontSize:15,fontFamily:'var(--font-b)',
+              }}>{b.l}</button>
+            ))}
+          </div>
+        </div>
+
+        {/* Présence + congés */}
+        <div style={{background:'var(--card2)',borderRadius:10,padding:'10px 14px',marginBottom:10,border:'1.5px solid var(--border)'}}>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8}}>
+            <div style={{fontFamily:'var(--font-h)',fontWeight:700,fontSize:14,color:'var(--text)'}}>👥 Qui travaille cette semaine ?</div>
+            <div style={{fontSize:12,color:'var(--muted)'}}>Décochez les absents</div>
+          </div>
+          {displayEmps.map(emp=>{
+            const leaves=getEmpLeaves(emp.id);
+            const isPresent=present[emp.id]!==false;
+            const isRenfort=renforts.includes(emp.id);
+            const workDaysCount=weekDates.filter((wd,di)=>{ const dow=wd.date.getDay(); return dow!==0&&!leaves.includes(di); }).length;
+            const dailyH=parseFloat((emp.contractHours/5).toFixed(2));
+            const expectedWeekH=parseFloat((workDaysCount*dailyH).toFixed(2));
+            return(
+              <div key={emp.id} style={{display:'flex',alignItems:'center',gap:10,marginBottom:5,padding:'7px 10px',background:isPresent?'white':'#F4F4F6',borderRadius:8,border:`1px solid ${isRenfort?'#F5B764':'var(--border)'}`,opacity:isPresent?1:.55}}>
+                <input type="checkbox" checked={isPresent} onChange={e=>setPresent(p=>({...p,[emp.id]:e.target.checked}))} style={{width:20,height:20,cursor:'pointer',accentColor:'var(--teal)',flexShrink:0}}/>
+                <div style={{width:28,height:28,borderRadius:'50%',background:emp.color||'var(--teal)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:12,fontWeight:700,color:'#fff',flexShrink:0}}>{emp.name[0]}</div>
+                <div style={{flex:1}}>
+                  <div style={{fontWeight:700,fontSize:16,display:'flex',alignItems:'center',gap:6}}>{emp.name}{isRenfort&&<span style={{fontSize:10,fontWeight:800,color:'#fff',background:'#F5B764',borderRadius:5,padding:'1px 7px'}}>✈ Renfort</span>}</div>
+                  <div style={{fontSize:12,color:'var(--muted)',marginTop:1}}>Contrat <strong>{emp.contractHours}h</strong>/sem · {workDaysCount} jours · {dailyH}h/j → <strong style={{color:'var(--teal-dark)'}}>{expectedWeekH}h prévues</strong></div>
+                </div>
+                {isRenfort&&<button onClick={()=>setRenforts(r=>r.filter(id=>id!==emp.id))} className="btn btn-ghost btn-xs" style={{flexShrink:0}}>Retirer</button>}
+                {leaves.length>0&&(
+                  <div style={{display:'flex',gap:4,flexWrap:'wrap',justifyContent:'flex-end'}}>
+                    {leaves.map(di=>(<span key={di} style={{background:'#EDE9FE',color:'#7C3AED',borderRadius:7,padding:'3px 8px',fontSize:11,fontWeight:700}}>🌴 {['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'][di]}</span>))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+
+          {/* Renfort picker */}
+          {renfortCandidates.length>0&&(
+            <div style={{marginTop:8}}>
+              {!showRenfortPicker?(
+                <button onClick={()=>setShowRenfortPicker(true)} className="btn btn-ghost btn-sm" style={{width:'100%',justifyContent:'center',border:'1.5px dashed var(--border)'}}>
+                  ✈ Ajouter un renfort d'une autre boutique
+                </button>
+              ):(
+                <div style={{background:'#FFF8EE',border:'1.5px solid #F5D6A0',borderRadius:10,padding:'10px 12px'}}>
+                  <div style={{fontSize:13,fontWeight:700,color:'#B05A00',marginBottom:8}}>Choisir un renfort (autres boutiques gérées)</div>
+                  <div style={{display:'grid',gap:6,maxHeight:200,overflowY:'auto'}}>
+                    {renfortCandidates.map(emp=>{
+                      const st=(manageableStores||[]).find(s=>s.id===emp.storeId);
+                      return(
+                        <button key={emp.id} onClick={()=>{ setRenforts(r=>[...r,emp.id]); setPresent(p=>({...p,[emp.id]:true})); setShowRenfortPicker(false); }}
+                          style={{display:'flex',alignItems:'center',gap:10,padding:'8px 10px',background:'#fff',border:'1px solid var(--border)',borderRadius:8,cursor:'pointer',textAlign:'left'}}>
+                          <div style={{width:26,height:26,borderRadius:'50%',background:emp.color||'var(--teal)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:700,color:'#fff'}}>{emp.name[0]}</div>
+                          <div style={{flex:1}}><div style={{fontWeight:700,fontSize:14}}>{emp.name}</div><div style={{fontSize:11,color:'var(--muted)'}}>{st?.name||'—'} · {emp.contractHours}h</div></div>
+                          <span style={{fontSize:18,color:'var(--teal-dark)'}}>+</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <button onClick={()=>setShowRenfortPicker(false)} className="btn btn-ghost btn-xs" style={{marginTop:8}}>Fermer</button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Jours fériés de la semaine */}
+        <div style={{ background:'#FFF0F2', border:'1.5px solid #F5B5C0', borderRadius:12, padding:'12px 14px', marginBottom:12 }}>
+          <div style={{ fontSize:13.5, fontWeight:700, color:'#C8002B', marginBottom:8 }}>🎌 Jour(s) férié(s) cette semaine ?</div>
+          <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+            {weekDates.map((wd,di)=>{
+              const lbl=['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'][di];
+              const on=holidayDays.includes(di);
+              return (
+                <button key={di} type="button" onClick={()=>setHolidayDays(p=>on?p.filter(x=>x!==di):[...p,di])}
+                  style={{ padding:'8px 12px', borderRadius:9, border:`2px solid ${on?'#C8002B':'var(--border)'}`, background:on?'#FFE0E5':'#fff', color:on?'#C8002B':'var(--muted)', fontWeight:on?700:500, fontSize:13, cursor:'pointer' }}>
+                  {lbl} {wd.date.getDate()}
+                </button>
+              );
+            })}
+          </div>
+          {holidayDays.length>0 && <div style={{ fontSize:12, color:'#A03048', marginTop:8 }}>Ces jours seront marqués « Férié » et aucun horaire ne sera généré dessus.</div>}
+        </div>
+
+        <button className="btn btn-primary"
+          onClick={()=>{
+            const selectedEmps=displayEmps.filter(e=>present[e.id]!==false);
+            onGenerate({openStart,openEnd,brk,selectedEmps,renfortIds:renforts,holidayDays});
+          }} disabled={openH<=0} style={{width:'100%',justifyContent:'center',fontSize:15,padding:'13px',borderRadius:12}}>
+          ⚡ Générer le planning
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ── DUPLICATE WEEK MODAL ─────────────────────────────────── */
+function DuplicateWeekModal({currentWeek,currentYear,onDuplicate,onClose}){
+  const [tWeek,setTWeek]=useState(currentWeek+1>52?1:currentWeek+1);
+  const [tYear,setTYear]=useState(currentWeek+1>52?currentYear+1:currentYear);
+  return (
+    <div className="overlay" onClick={onClose}>
+      <div className="modal" onClick={e=>e.stopPropagation()} style={{maxWidth:440}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}>
+          <h3 style={{fontFamily:'var(--font-h)',fontWeight:800,fontSize:20}}>📋 Dupliquer la semaine</h3>
+          <button className="btn btn-ghost btn-xs" onClick={onClose}>✕</button>
+        </div>
+        <p style={{fontSize:14,color:'var(--muted)',marginBottom:18}}>Copie complète du planning de la semaine {currentWeek} ({currentYear}) vers la semaine choisie. Le planning existant de la semaine cible sera remplacé.</p>
+        <div style={{display:'flex',gap:12,marginBottom:20}}>
+          <div style={{flex:1}}>
+            <label className="lbl">Semaine cible</label>
+            <input className="inp" type="number" min="1" max="53" value={tWeek} onChange={e=>setTWeek(parseInt(e.target.value)||1)} />
+          </div>
+          <div style={{flex:1}}>
+            <label className="lbl">Année</label>
+            <input className="inp" type="number" min="2024" max="2030" value={tYear} onChange={e=>setTYear(parseInt(e.target.value)||currentYear)} />
+          </div>
+        </div>
+        <div style={{display:'flex',gap:10}}>
+          <button className="btn btn-ghost" style={{flex:1,justifyContent:'center'}} onClick={onClose}>Annuler</button>
+          <button className="btn btn-primary" style={{flex:1,justifyContent:'center'}} onClick={()=>onDuplicate(tWeek,tYear)}>📋 Dupliquer</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── BORROW MODAL ─────────────────────────────────────────── */
+function BorrowModal({store,allEmployees,allStores,currentEmps,onBorrow,onClose}){
+  const[selected,setSelected]=useState('');
+  const available=allEmployees.filter(e=>!currentEmps.find(c=>c.id===e.id))
+    .sort((a,b)=>(b.isFloating?1:0)-(a.isFloating?1:0)); // floating vendeurs first
+  return(
+    <div className="overlay" onClick={onClose}>
+      <div className="modal" style={{maxWidth:700}} onClick={ev=>ev.stopPropagation()}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:16}}>
+          <div>
+            <h3 style={{fontFamily:'var(--font-h)',fontWeight:800,fontSize:20}}>👥 Ajouter un employé</h3>
+            <p style={{color:'var(--muted)',fontSize:14,marginTop:3}}>Pour ce planning · <strong>{store.name}</strong></p>
+          </div>
+          <button className="btn btn-ghost btn-xs" onClick={onClose}>✕</button>
+        </div>
+        <div style={{background:'#FFF7E0',border:'1.5px solid #F5D06A',borderRadius:10,padding:'10px 14px',marginBottom:14,fontSize:13,color:'#B07D00'}}>
+          ⚡ Employé ajouté temporairement · Son magasin d'origine reste inchangé
+        </div>
+        <div style={{display:'grid',gap:7,maxHeight:320,overflowY:'auto',marginBottom:16}}>
+          {available.map(emp=>{
+            const homeStore=allStores.find(s=>s.id===(emp.originalStoreId||emp.storeId));
+            return(
+              <button key={emp.id} onClick={()=>setSelected(emp.id)} style={{
+                display:'flex',alignItems:'center',gap:12,padding:'11px 14px',borderRadius:11,cursor:'pointer',
+                border:`2px solid ${selected===emp.id?store.color:'var(--border)'}`,
+                background:selected===emp.id?store.color+'12':'#fff',
+                fontFamily:'var(--font-b)',textAlign:'left',transition:'all .15s',
+              }}>
+                <div style={{width:36,height:36,borderRadius:'50%',background:emp.color||'var(--teal)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:15,fontWeight:700,color:'#fff',flexShrink:0}}>{emp.name[0]}</div>
+                <div style={{flex:1}}>
+                  <div style={{fontWeight:700,fontSize:16,display:'flex',alignItems:'center',gap:7}}>{emp.name}{emp.isFloating&&<span style={{fontSize:10,fontWeight:800,color:'#fff',background:'#F5A623',borderRadius:5,padding:'1px 7px'}}>✈ VOLANT</span>}</div>
+                  <div style={{fontSize:12,color:'var(--dim)',marginTop:1}}>{emp.isFloating?'Vendeur volant':homeStore?.name} · {emp.contractHours}h/sem</div>
+                </div>
+                {homeStore&&<div style={{width:8,height:8,borderRadius:'50%',background:homeStore.color,flexShrink:0}}/>}
+              </button>
+            );
+          })}
+        </div>
+        <button className="btn btn-primary" style={{width:'100%',justifyContent:'center',padding:'13px',fontSize:15,borderRadius:12,opacity:!selected?.6:1}}
+          onClick={()=>selected&&onBorrow(selected)} disabled={!selected}>
+          ✓ Ajouter au planning
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ── WEEK NAV ─────────────────────────────────────────────── */
+function WeekNav({cw,setCw}){
+  return(
+    <div style={{display:'flex',alignItems:'center',gap:8}}>
+      <button className="btn btn-ghost btn-sm" onClick={()=>setCw(w=>Math.max(1,w-1))}>‹</button>
+      <div style={{background:'var(--teal-light)',border:'2px solid var(--teal-mid)',borderRadius:10,padding:'9px 18px',textAlign:'center',minWidth:88}}>
+        <span style={{fontFamily:'var(--font-h)',fontWeight:800,color:'var(--teal-dark)',fontSize:18}}>S{cw}</span>
+      </div>
+      <button className="btn btn-ghost btn-sm" onClick={()=>setCw(w=>Math.min(52,w+1))}>›</button>
+    </div>
+  );
+}
+
+/* ── MAIN ─────────────────────────────────────────────────── */
+export default function PlanningEditor(){
+  const{stores,employees,shiftTypes,getSchedule,setShift,setBulkSchedule,currentWeek,setCurrentWeek,currentYear,selectedStore,setSelectedStore,getWeekDatesForCurrentWeek,leaveRequests,overtimeRecords,getEmpOvertimeBalance,resolveOvertime,deleteOvertimeEntry,updateOvertimeHours,authRole,schedules,currentEmp,getVisibleStoreIds,effectiveContractHours,isDirigeant}=useApp();
+  const getContractH = React.useCallback((emp)=>effectiveContractHours(emp,currentWeek,currentYear),[effectiveContractHours,currentWeek,currentYear]);
+  // Stores this user can assign shifts to (managed stores for managers, all for dirigeants)
+  const manageableStores = React.useMemo(()=>{
+    const ids = getVisibleStoreIds ? getVisibleStoreIds() : stores.map(s=>s.id);
+    return stores.filter(s=>ids.includes(s.id));
+  },[stores, getVisibleStoreIds]);
+  // Manager defaults to their own store; otherwise last selected or first store
+  const defaultStore = selectedStore || (currentEmp&&['manager','dirigeant','admin'].includes(authRole)&&currentEmp.storeId) || stores[0]?.id || '';
+  const[activeStore,setAS]=useState(defaultStore);
+  const[viewMode,setViewMode]=useState('week');
+  const[activeDay,setActiveDay]=useState(0);
+  const[editCell,setEditCell]=useState(null);
+  const[activeTile,setActiveTile]=useState(null); // selected quick tile for painting
+  const[dayChooser,setDayChooser]=useState(null); // {empId,dayIdx,hours} for ouverture/fermeture choice
+  const[showDuplicate,setShowDuplicate]=useState(false);
+  const[teamView,setTeamView]=useState(false); // multi-store team overview for managers
+  const[showWknd,setShowWknd]=useState(false);
+  const[showAuto,setShowAuto]=useState(false);
+  const[showBorrow,setShowBorrow]=useState(false);
+  const[confirmWknd,setConfirmWknd]=useState(null);
+  const[generating,setGenerating]=useState(false);
+  const[borrowedEmps,setBorrowedEmps]=useState([]);
+  // Manual additions are PONCTUAL: clear them when the week changes so an added
+  // person only appears on the week where the manager added them.
+  React.useEffect(()=>{ setBorrowedEmps([]); },[currentWeek,currentYear]);
+  const[detailPopup,setDetailPopup]=useState(null); // {empId, dayIdx}
+  const[overtimeModal,setOvertimeModal]=useState(null); // {empId}
+  const[showClearConfirm,setShowClearConfirm]=useState(false);
+  const[clipboard,setClipboard]=useState(null); // copied shift data
+
+  // Drag state — use refs for performance during drag
+  const dragSrcRef=useRef(null);
+  const[dragOver,setDragOver]=useState(null);
+
+  const store=stores.find(s=>s.id===activeStore);
+  const storeEmps=employees.filter(e=>e.storeId===activeStore);
+  const manualExtra=borrowedEmps.map(id=>employees.find(e=>e.id===id)).filter(Boolean);
+
+  // Managers assigned to this store (managedStores includes it) but whose home store is different
+  const assignedManagers = employees.filter(e=>
+    ['manager','dirigeant','admin'].includes(e.role) &&
+    e.storeId !== activeStore &&
+    (e.managedStores||[]).includes(activeStore)
+  );
+
+  // AUTO-detect visitors: employees from OTHER stores who have a real shift in THIS store this week
+  const autoVisitors = React.useMemo(()=>{
+    const ownSched=getSchedule(activeStore,currentWeek,currentYear);
+    const visitorIds=new Set();
+    employees.forEach(e=>{
+      if(e.storeId===activeStore) return; // already a home employee
+      // does this foreign employee have any shift in the active store this week?
+      for(let di=0;di<7;di++){
+        const sh=ownSched[`${e.id}_${di}`];
+        if(sh && (sh.type==='work'||sh.type==='communication'||sh.type==='meeting')){
+          visitorIds.add(e.id); break;
+        }
+      }
+    });
+    return employees.filter(e=>visitorIds.has(e.id));
+  },[employees,activeStore,currentWeek,currentYear,schedules]);
+
+  const extraEmps=[...manualExtra,...assignedManagers.filter(m=>!manualExtra.find(x=>x.id===m.id)),...autoVisitors.filter(v=>!manualExtra.find(m=>m.id===v.id)&&!assignedManagers.find(m=>m.id===v.id))];
+  // A person with an endDate disappears from planning weeks AFTER that date,
+  // but stays on the week that contains the date and all earlier weeks.
+  const _wkDates = getWeekDatesForCurrentWeek(currentWeek);
+  const _weekMonday = _wkDates[0]?.date;
+  const isActiveThisWeek = (e) => {
+    if (!e.endDate) return true;
+    if (!_weekMonday) return true;
+    const end = new Date(e.endDate + 'T23:59:59');
+    // Show if the week's Monday is on or before the end date (week containing/after start still shown until fully past)
+    return _weekMonday <= end;
+  };
+  const allDisplayEmps=[...storeEmps,...extraEmps.filter(e=>!storeEmps.find(s=>s.id===e.id))].filter(isActiveThisWeek);
+
+  // ── LEAVE ALERTS for current week ────────────────────────────
+  const weekLeaveAlerts = React.useMemo(()=>{
+    const alerts=[];
+    allDisplayEmps.forEach(emp=>{
+      leaveRequests.filter(r=>r.employeeId===emp.id).forEach(req=>{
+        const hasThisWeek=req.weeks?.some(w=>w.week===currentWeek&&w.year===currentYear);
+        if(!hasThisWeek) return;
+        const days=req.weeks?.find(w=>w.week===currentWeek&&w.year===currentYear)?.days||[];
+        alerts.push({emp, req, days});
+      });
+    });
+    return alerts;
+  },[allDisplayEmps,leaveRequests,currentWeek,currentYear]);
+  // Locked cells = approved leave days (non-editable, auto-placed)
+  const lockedLeaveCells = React.useMemo(()=>{
+    const locked={};
+    const ownSched=getSchedule(activeStore,currentWeek,currentYear);
+    allDisplayEmps.forEach(emp=>{
+      leaveRequests.filter(r=>r.employeeId===emp.id&&r.status==='approved').forEach(req=>{
+        const w=req.weeks?.find(x=>x.week===currentWeek&&x.year===currentYear);
+        if(w) (w.days||[]).forEach(di=>{
+          const key=`${emp.id}_${di}`;
+          // If manager saved a real override for this cell, it's no longer locked
+          const own=ownSched[key];
+          if(own && !own._leaveLocked) return;
+          locked[key]={type:req.type||'vacation'};
+        });
+      });
+    });
+    return locked;
+  },[allDisplayEmps,leaveRequests,currentWeek,currentYear,activeStore,getSchedule]);
+  const weekDates=getWeekDatesForCurrentWeek(currentWeek);
+  const ownSchedule=getSchedule(activeStore,currentWeek,currentYear);
+
+  // Build merged schedule: own shifts + "déplacement" shifts found in OTHER stores
+  // for employees whose home store is the active store.
+  const {schedule, awayShifts} = React.useMemo(()=>{
+    const merged = {...ownSchedule};
+    const away = {}; // key empId_dayIdx -> {storeId, storeName, shift}
+    // For each employee of THIS store, look in all other stores' schedules this week
+    storeEmps.forEach(emp=>{
+      stores.forEach(st=>{
+        if(st.id===activeStore) return;
+        const otherSched=schedules[`${st.id}_${currentYear}_W${currentWeek}`]||{};
+        weekDates.forEach((_,di)=>{
+          const key=`${emp.id}_${di}`;
+          const sh=otherSched[key];
+          if(sh && (sh.type==='work'||sh.type==='communication'||sh.type==='meeting')){
+            // This employee is working in another store this day = déplacement
+            // Only show if their OWN store doesn't already have a shift that day
+            if(!merged[key] || merged[key].type==='rest' || !merged[key].startTime){
+              merged[key]={...sh, _away:true, _awayStoreId:st.id, _awayStoreName:st.name, _awayColor:st.color};
+              away[key]={storeId:st.id, storeName:st.name, color:st.color, shift:sh};
+            }
+          }
+        });
+      });
+    });
+    // Overlay approved leaves (auto-placed, locked) so they always show —
+    // unless the manager has saved an explicit override for that cell in this store.
+    allDisplayEmps.forEach(emp=>{
+      leaveRequests.filter(r=>r.employeeId===emp.id&&r.status==='approved').forEach(req=>{
+        const w=req.weeks?.find(x=>x.week===currentWeek&&x.year===currentYear);
+        if(w) (w.days||[]).forEach(di=>{
+          const key=`${emp.id}_${di}`;
+          const own=ownSchedule[key];
+          // If a real shift/override exists in the active store for this cell, keep it (manager override)
+          if(own && !own._leaveLocked) return;
+          merged[key]={type:req.type||'vacation',startTime:null,endTime:null,breakH:0,hours:null,note:'Congé validé',_leaveLocked:true};
+        });
+      });
+    });
+    return {schedule: merged, awayShifts: away};
+  },[ownSchedule, schedules, storeEmps, stores, activeStore, currentWeek, currentYear, weekDates, allDisplayEmps, leaveRequests]);
+  const displayDays=showWknd?weekDates:weekDates.slice(0,6);
+
+  const setStore=id=>{ setAS(id); setSelectedStore(id); setBorrowedEmps([]); };
+  const totalH=empId=>{
+    let t=0;
+    const workTypes=['work','communication','meeting','school'];
+    weekDates.forEach((_,i)=>{
+      const s=schedule[`${empId}_${i}`];
+      if(!s) return;
+      // Recompute hours from actual times (never trust stored 'hours')
+      if(workTypes.includes(s.type)) t+=mainHours(s);
+      if(s.split && workTypes.includes(s.split.type)) t+=splitHours(s);
+      // Holidays count as a worked day (flat hours credit, default 7h)
+      if(s.type==='holiday'||s.type==='exam') t+=(Number(s.hours)||7);
+    });
+    return parseFloat(t.toFixed(2));
+  };
+
+  const handleCell=(empId,dayIdx,forceEdit=false)=>{
+    const dow=weekDates[dayIdx].date.getDay();
+    // Approved leave = locked by default, but a manager can choose to override it
+    if(lockedLeaveCells[`${empId}_${dayIdx}`] && !forceEdit){
+      const emp=allDisplayEmps.find(e=>e.id===empId);
+      const ok=window.confirm(`${emp?.name||'Cette personne'} est en congé validé ce jour-là.\n\nVoulez-vous quand même le modifier (ex : férié travaillé, coupure, horaires particuliers) ?\n\nOK = modifier · Annuler = laisser le congé`);
+      if(!ok) return;
+      // proceed to edit modal (override)
+      setEditCell({empId,dayIdx,overrideLeave:true});
+      return;
+    }
+    // Tile-paint mode: a tile is selected → apply it directly to the clicked cell
+    if(activeTile && !forceEdit){
+      // For 7h/8h workday tiles, ask Ouverture or Fermeture first
+      if(activeTile==='work7'||activeTile==='work8'){
+        setDayChooser({empId,dayIdx,hours:activeTile==='work7'?7:8});
+        return;
+      }
+      applyTile(empId,dayIdx,activeTile);
+      return;
+    }
+    if(!showWknd&&dow===0){ setConfirmWknd({empId,dayIdx}); return; }
+    setEditCell({empId,dayIdx});
+  };
+
+  // Build a work-day shift (open or close side), splitting around store lunch closure if any
+  const buildWorkDay=(hours,side)=>{
+    const toM=t=>{const[h,m]=t.split(':').map(Number);return h*60+m;};
+    const open=store.openTime||'09:30';
+    const close=store.closeTime||'19:30';
+    const hasLunch=!!(store.lunchBreak&&store.lunchStart&&store.lunchEnd);
+    const breakMins=60; // 1h lunch
+    const openM=toM(open), closeM=toM(close);
+    let sM,eM;
+    if(side==='close'){ eM=closeM; sM=eM-hours*60-breakMins; if(sM<openM)sM=openM; }
+    else { sM=openM; eM=sM+hours*60+breakMins; if(eM>closeM)eM=closeM; }
+
+    if(hasLunch){
+      const lS=toM(store.lunchStart), lE=toM(store.lunchEnd);
+      const amStart=Math.max(sM,openM), amEnd=Math.min(eM,lS);
+      const pmStart=Math.max(sM,lE), pmEnd=Math.min(eM,closeM);
+      const amH=amEnd>amStart?(amEnd-amStart)/60:0;
+      const pmH=pmEnd>pmStart?(pmEnd-pmStart)/60:0;
+      return {type:'work',startTime:minsToTime(amStart),endTime:minsToTime(amEnd>amStart?amEnd:amStart),breakH:0,hours:amH,note:side==='close'?'Fermeture':'Ouverture',depannage:false,
+        split: pmH>0?{type:'work',startTime:minsToTime(pmStart),endTime:minsToTime(pmEnd),hours:pmH,note:'Après-midi'}:null};
+    }
+    const h=(eM-sM)/60-breakMins/60;
+    return {type:'work',startTime:minsToTime(sM),endTime:minsToTime(eM),breakH:1,hours:h,note:side==='close'?'Fermeture':'Ouverture',depannage:false};
+  };
+
+  // Apply a work day (7h/8h) with chosen side
+  // Returns the store name where empId already works that day in ANOTHER store, or null.
+  const findDoublon=(empId,dayIdx,targetStoreId)=>{
+    // Any real entry (work OR rest/congé/férié/etc) in another store means the person
+    // is already assigned that day → cannot be placed here.
+    const BLOCKING=['work','communication','meeting','school','exam','rest','vacation','holiday'];
+    for(const s of stores){
+      if(s.id===targetStoreId) continue;
+      const other=schedules[`${s.id}_${currentYear}_W${currentWeek}`]||{};
+      const sh=other[`${empId}_${dayIdx}`];
+      if(sh && BLOCKING.includes(sh.type)){
+        const typeLabel=(shiftTypes.find(t=>t.id===sh.type)?.label)||sh.type;
+        return {storeName:s.name, typeLabel};
+      }
+    }
+    return null;
+  };
+  const doublonAlert=(empId,dayIdx,info)=>{
+    const dayName=['lundi','mardi','mercredi','jeudi','vendredi','samedi','dimanche'][dayIdx];
+    const name=employees.find(e=>e.id===empId)?.name||'cette personne';
+    const where=typeof info==='string'?info:`${info.storeName} (${info.typeLabel})`;
+    alert(`Impossible : ${name} est déjà prévu(e) à ${where} le ${dayName}. Une personne ne peut être qu'à un seul endroit / état le même jour. Retirez d'abord l'autre créneau.`);
+  };
+
+  const applyWorkDay=(empId,dayIdx,hours,side)=>{
+    const tgt=resolveSaveTarget(empId,dayIdx);
+    // Block doublon: person already working elsewhere that day
+    const conflict=findDoublon(empId,dayIdx,tgt.storeId);
+    if(conflict){ doublonAlert(empId,dayIdx,conflict); setDayChooser(null); return; }
+    setShift(tgt.storeId,currentWeek,currentYear,empId,dayIdx,buildWorkDay(hours,side));
+    setDayChooser(null);
+  };
+
+  // Apply a quick tile (rest/leave/etc) to a cell
+  const applyTile=(empId,dayIdx,tile)=>{
+    const tgt=resolveSaveTarget(empId,dayIdx);
+    // A person already placed elsewhere (working OR repos/congé) can't be placed here
+    const conflict=findDoublon(empId,dayIdx,tgt.storeId);
+    if(conflict){ doublonAlert(empId,dayIdx,conflict); return; }
+    const labels={rest:'',vacation:'Congé',holiday:'Férié',school:'École',exam:'Examen',meeting:'Réunion',communication:'Communication'};
+    const payload={type:tile,startTime:null,endTime:null,breakH:0,hours:(tile==='holiday'||tile==='exam')?7:null,note:labels[tile]||'',depannage:false};
+    setShift(tgt.storeId,currentWeek,currentYear,empId,dayIdx,payload);
+  };
+
+  // ── COPY / PASTE shifts ──
+  const handleCopyShift=(sh)=>{
+    // Store a clean copy (strip away-markers)
+    const clean={type:sh.type,startTime:sh.startTime,endTime:sh.endTime,breakH:sh.breakH||0,hours:sh.hours,note:sh.note||'',depannage:sh.depannage||false};
+    if(sh.split) clean.split={...sh.split};
+    setClipboard(clean);
+  };
+  const handlePasteShift=(empId,dayIdx)=>{
+    if(!clipboard) return;
+    const dow=weekDates[dayIdx].date.getDay();
+    if(!showWknd&&dow===0){ setConfirmWknd({empId,dayIdx}); return; }
+    const WORK=['work','communication','meeting','school'];
+    if(WORK.includes(clipboard.type)){
+      const conflict=findDoublon(empId,dayIdx,activeStore);
+      if(conflict){ doublonAlert(empId,dayIdx,conflict); return; }
+    }
+    setShift(activeStore,currentWeek,currentYear,empId,dayIdx,{...clipboard});
+  };
+
+  // Where to save a shift: if it's an "away" (déplacement) shift, save to the OTHER store
+  const resolveSaveTarget=(empId,dayIdx)=>{
+    // Prioritize the ACTIVE store's own cell: if there is any real entry saved here,
+    // editing/deleting must target THIS store (never redirect to a displacement store).
+    const ownCell=ownSchedule[`${empId}_${dayIdx}`];
+    if(ownCell) return {storeId:activeStore, isAway:false};
+    // Otherwise, if the cell only shows a displacement overlay, target the away store.
+    const sh=schedule[`${empId}_${dayIdx}`];
+    if(sh && sh._away && sh._awayStoreId){
+      return {storeId:sh._awayStoreId, isAway:true};
+    }
+    return {storeId:activeStore, isAway:false};
+  };
+
+  const handleSave=(data, targetStoreId)=>{
+    if(!editCell) return;
+    const tgt = targetStoreId || resolveSaveTarget(editCell.empId,editCell.dayIdx).storeId;
+    const prevTgt = resolveSaveTarget(editCell.empId,editCell.dayIdx).storeId;
+
+    // ── BLOCK DOUBLON: same person can't be in 2 places/states the same day ──
+    const BLOCKING=['work','communication','meeting','school','exam','rest','vacation','holiday'];
+    if(data && BLOCKING.includes(data.type)){
+      const conflict=findDoublon(editCell.empId, editCell.dayIdx, tgt);
+      // conflict is {storeName,typeLabel} from ANOTHER store; prevTgt is where we already are
+      if(conflict && conflict.storeName!==stores.find(s=>s.id===prevTgt)?.name){
+        doublonAlert(editCell.empId, editCell.dayIdx, conflict);
+        return;
+      }
+    }
+
+    // If the shift moved to a different store, clear it from the previous location
+    if(prevTgt && prevTgt!==tgt){
+      setShift(prevTgt,currentWeek,currentYear,editCell.empId,editCell.dayIdx,null);
+    }
+    // Mark displacement metadata when target differs from the employee's home store
+    const emp=employees.find(e=>e.id===editCell.empId);
+    const isAway = emp && tgt!==emp.storeId;
+    const tgtStore = stores.find(s=>s.id===tgt);
+    const payload = isAway
+      ? {...data, _away:true, _awayStoreId:tgt, _awayStoreName:tgtStore?.name, _awayColor:tgtStore?.color}
+      : {...data};
+    if(!isAway){ delete payload._away; delete payload._awayStoreId; delete payload._awayStoreName; delete payload._awayColor; }
+    setShift(tgt,currentWeek,currentYear,editCell.empId,editCell.dayIdx,payload);
+    setEditCell(null);
+  };
+  const handleDelete=()=>{ if(!editCell) return; const tgt=resolveSaveTarget(editCell.empId,editCell.dayIdx); setShift(tgt.storeId,currentWeek,currentYear,editCell.empId,editCell.dayIdx,null); setEditCell(null); };
+
+  /* ── AUTO GENERATE — SMART ALGORITHM ───────────────────────── */
+  const handleAutoGen=async({openStart,openEnd,brk,selectedEmps,renfortIds,holidayDays})=>{
+    const storeHasLunch = !!(store.lunchBreak && store.lunchStart && store.lunchEnd);
+    setGenerating(true); setShowAuto(false);
+    const holidaySet = new Set(holidayDays||[]);
+    const genEmps = ((selectedEmps && selectedEmps.length) ? selectedEmps : storeEmps).filter(isActiveThisWeek);
+
+    // ── Helpers ──
+    const toMins = t => { const [h,m]=t.split(':').map(Number); return h*60+m; };
+    const getEmpLeaveDays=(empId)=>{
+      const days=new Set();
+      leaveRequests.filter(r=>r.employeeId===empId&&r.status==='approved').forEach(req=>{
+        req.weeks?.forEach(we=>{ if(we.week===currentWeek&&we.year===currentYear){ we.days.forEach(di=>days.add(di)); } });
+      });
+      return days;
+    };
+
+    const storeOpenMins = toMins(openStart);
+    const storeCloseMins = toMins(openEnd);
+    const lunchSMins = storeHasLunch ? toMins(store.lunchStart) : null;
+    const lunchEMins = storeHasLunch ? toMins(store.lunchEnd) : null;
+    // The lunch break for a worker (in minutes) when the store closes midday is fixed at 1h
+    const LUNCH_BREAK_MINS = 60;
+    const bulk = {};
+    const empHours = {}; // worked hours (paid) per emp this week
+    genEmps.forEach(e=>{ empHours[e.id]=0; });
+
+    const workingDays = [0,1,2,3,4,5]; // Mon..Sat (Sunday = 6 closed)
+
+    // Build a holiday-as-worked map: holidays count as a 7h worked day.
+    // Effective contract per emp for this week (history-aware)
+    const contractOf = (emp) => effectiveContractHours(emp, currentWeek, currentYear);
+
+    // How many days each emp works this week (constraint) and resulting daily hours
+    const HOLIDAY_HOURS = 7;
+    const planByEmp = {}; // empId -> { workDayIdxs:[], dailyMins, restDays:Set, holidayDays:Set }
+
+    genEmps.forEach(emp => {
+      const leave = getEmpLeaveDays(emp.id);
+      const empHolidays = new Set(workingDays.filter(d => holidaySet.has(d)));
+      // Available working days = Mon-Sat, not on leave, not holiday (holidays handled separately), not fixed rest
+      let avail = workingDays.filter(d => !leave.has(d) && !empHolidays.has(d));
+      // Fixed rest day constraint
+      if (emp.fixedRestDay != null && emp.fixedRestDay >= 0) {
+        avail = avail.filter(d => d !== emp.fixedRestDay);
+      }
+      const contract = contractOf(emp);
+      // Holidays already credit HOLIDAY_HOURS each; remaining hours to spread over worked days
+      const holidayCredit = empHolidays.size * HOLIDAY_HOURS;
+      const remaining = Math.max(0, contract - holidayCredit);
+      // Number of work days: constraint (workDays) or default min(avail, 5)
+      let nDays = emp.workDays && emp.workDays > 0 ? emp.workDays : Math.min(avail.length, 5);
+      nDays = Math.min(nDays, avail.length);
+      const dailyH = nDays > 0 ? remaining / nDays : 0;
+      planByEmp[emp.id] = { avail, nDays, dailyMins: Math.round(dailyH*60), empHolidays, leave, contract };
+    });
+
+    // Choose which days each emp actually works (prefer days needing coverage, spread rest)
+    // Simple approach: take the first nDays of avail, but rotate start to spread rest days.
+    const dayLoad = {}; workingDays.forEach(d=>dayLoad[d]=0);
+    genEmps.forEach((emp,i) => {
+      const p = planByEmp[emp.id];
+      if (!p) return;
+      // Sort available days by current load (fill less-covered days first), stable rotate by index
+      const ordered = [...p.avail].sort((a,b)=> (dayLoad[a]-dayLoad[b]) || a-b);
+      const chosen = ordered.slice(0, p.nDays).sort((a,b)=>a-b);
+      p.workSet = new Set(chosen);
+      chosen.forEach(d=>dayLoad[d]++);
+    });
+
+    // Assign shift times per day with opener/closer + preference
+    weekDates.forEach((wd, di) => {
+      const dow = wd.date.getDay();
+      const isSunday = dow === 0;
+
+      // Holiday → everyone gets a 7h worked day (counts as worked)
+      if (holidaySet.has(di)) {
+        genEmps.forEach(emp => {
+          const leave = planByEmp[emp.id]?.leave || new Set();
+          if (leave.has(di)) { bulk[`${emp.id}_${di}`] = {type:'vacation',startTime:null,endTime:null,breakH:0,hours:null,note:'Congé approuvé',depannage:false}; return; }
+          bulk[`${emp.id}_${di}`] = {type:'holiday',startTime:null,endTime:null,breakH:0,hours:HOLIDAY_HOURS,note:'Férié (7h)',depannage:false};
+          empHours[emp.id] += HOLIDAY_HOURS;
+        });
+        return;
+      }
+
+      // Mark rest / leave first
+      genEmps.forEach(emp => {
+        const key = `${emp.id}_${di}`;
+        const p = planByEmp[emp.id];
+        if (isSunday) { bulk[key] = {type:'rest',startTime:null,endTime:null,breakH:0,hours:null,note:'',depannage:false}; return; }
+        if (p && p.leave.has(di)) { bulk[key] = {type:'vacation',startTime:null,endTime:null,breakH:0,hours:null,note:'Congé approuvé',depannage:false}; return; }
+        if (p && !p.workSet.has(di)) { bulk[key] = {type:'rest',startTime:null,endTime:null,breakH:0,hours:null,note: emp.fixedRestDay===di?'Repos fixe':'Repos',depannage:false}; }
+      });
+
+      if (isSunday) return;
+
+      // Who works today
+      const workers = genEmps.filter(e => planByEmp[e.id] && planByEmp[e.id].workSet.has(di));
+      if (workers.length === 0) return;
+
+      // Order workers: openers-preferred first, closers-preferred last, others by least hours
+      const pref = e => e.shiftPref || 'none';
+      const sorted = [...workers].sort((a,b)=>{
+        const pa=pref(a), pb=pref(b);
+        if(pa==='open'&&pb!=='open') return -1;
+        if(pb==='open'&&pa!=='open') return 1;
+        if(pa==='close'&&pb!=='close') return 1;
+        if(pb==='close'&&pa!=='close') return -1;
+        return (empHours[a.id]||0)-(empHours[b.id]||0);
+      });
+
+      const n = sorted.length;
+      const amplitude = storeCloseMins - storeOpenMins;
+
+      sorted.forEach((emp, idx) => {
+        const key = `${emp.id}_${di}`;
+        // Skip if this person is already scheduled to work in ANOTHER store that day (no doublon)
+        const alreadyElsewhere = stores.some(s => {
+          if (s.id === activeStore) return false;
+          const os = schedules[`${s.id}_${currentYear}_W${currentWeek}`] || {};
+          const osh = os[`${emp.id}_${di}`];
+          return osh && ['work','communication','meeting','school'].includes(osh.type);
+        });
+        if (alreadyElsewhere) return;
+        const p = planByEmp[emp.id];
+        // Worked minutes target for this day (exact from contract), break added on top
+        const workMins = p.dailyMins;
+        const breakForDay = storeHasLunch ? LUNCH_BREAK_MINS : Math.round((brk||0)*60);
+        const spanMins = workMins + breakForDay; // amplitude needed including break
+
+        let sMins, eMins, note;
+        if (idx === 0) {
+          sMins = storeOpenMins; eMins = roundTo30(storeOpenMins + spanMins); note='Ouverture';
+          if (eMins > storeCloseMins) eMins = storeCloseMins;
+        } else if (idx === n-1) {
+          eMins = storeCloseMins; sMins = roundTo30(storeCloseMins - spanMins); note='Fermeture';
+          if (sMins < storeOpenMins) sMins = storeOpenMins;
+        } else {
+          const frac = idx/(n-1);
+          sMins = roundTo30(storeOpenMins + (amplitude - spanMins)*frac);
+          eMins = roundTo30(sMins + spanMins);
+          if (eMins > storeCloseMins){ eMins=storeCloseMins; sMins=roundTo30(eMins-spanMins); }
+          if (sMins < storeOpenMins) sMins=storeOpenMins;
+          note='Journée';
+        }
+
+        if (storeHasLunch) {
+          // Worker takes the store's midday closure as their 1h break (split shift)
+          const amStart = Math.max(sMins, storeOpenMins);
+          const amEnd = Math.min(eMins, lunchSMins);
+          const pmStart = Math.max(sMins, lunchEMins);
+          const pmEnd = Math.min(eMins, storeCloseMins);
+          const amH = amEnd>amStart ? calcH(minsToTime(amStart),minsToTime(amEnd),0) : 0;
+          const pmH = pmEnd>pmStart ? calcH(minsToTime(pmStart),minsToTime(pmEnd),0) : 0;
+          bulk[key] = {
+            type:'work', startTime:minsToTime(amStart), endTime:minsToTime(amEnd>amStart?amEnd:amStart),
+            breakH:0, hours:amH, note, depannage:false,
+            split: pmH>0 ? {type:'work',startTime:minsToTime(pmStart),endTime:minsToTime(pmEnd),hours:pmH,note:'Après-midi'} : null,
+          };
+          empHours[emp.id] += amH + pmH;
+        } else {
+          const bH = (brk||0);
+          const h = calcH(minsToTime(sMins), minsToTime(eMins), bH);
+          bulk[key] = {type:'work',startTime:minsToTime(sMins),endTime:minsToTime(eMins),breakH:bH,hours:h,note,depannage:false};
+          empHours[emp.id] += h;
+        }
+      });
+    });
+
+    await setBulkSchedule(activeStore,currentWeek,currentYear,bulk);
+    setGenerating(false);
+  };
+
+  // ── DUPLIQUER LE PLANNING VERS UNE AUTRE SEMAINE ──────────
+  const handleDuplicateWeek=async(targetWeek,targetYear)=>{
+    if(!activeStore) return;
+    const srcKey=`${activeStore}_${currentYear}_W${currentWeek}`;
+    const src=schedules[srcKey]||{};
+    const copy={};
+    Object.entries(src).forEach(([k,v])=>{ copy[k]=v?{...v}:v; });
+    await setBulkSchedule(activeStore,targetWeek,targetYear,copy);
+    setShowDuplicate(false);
+  };
+
+  // ── EFFACER LE PLANNING ──────────────────────────────────
+  const handleClearPlanning=async()=>{
+    if(!activeStore) return;
+    const bulk={};
+    // Set all cells for all store employees to null (empty)
+    allDisplayEmps.forEach(emp=>{
+      weekDates.forEach((_,di)=>{
+        bulk[`${emp.id}_${di}`]=null;
+      });
+    });
+    await setBulkSchedule(activeStore,currentWeek,currentYear,bulk);
+    setShowClearConfirm(false);
+  };
+
+  /* ── DRAG & DROP — ATOMIC SWAP ───────────────────────────── */
+  const handleDragStart=useCallback((empId,dayIdx,e)=>{
+    const sh=schedule[`${empId}_${dayIdx}`];
+    if(!sh){ e.preventDefault(); return; }
+    dragSrcRef.current={empId,dayIdx};
+    e.dataTransfer.effectAllowed='move';
+    // Store shift data in dataTransfer as backup
+    e.dataTransfer.setData('text/plain',JSON.stringify({empId,dayIdx}));
+  },[schedule]);
+
+  const handleDragOver=useCallback((empId,dayIdx,e)=>{
+    e.preventDefault();
+    e.dataTransfer.dropEffect='move';
+    setDragOver({empId,dayIdx});
+  },[]);
+
+  const handleDrop=useCallback((empId,dayIdx,e)=>{
+    e.preventDefault();
+    e.stopPropagation();
+    const src=dragSrcRef.current;
+    if(!src) return;
+
+    // Same cell: nothing to do
+    if(src.empId===empId&&src.dayIdx===dayIdx){
+      dragSrcRef.current=null; setDragOver(null); return;
+    }
+
+    const srcKey=`${src.empId}_${src.dayIdx}`;
+    const dstKey=`${empId}_${dayIdx}`;
+    const srcShift=schedule[srcKey];
+    const dstShift=schedule[dstKey];
+
+    if(!srcShift){ dragSrcRef.current=null; setDragOver(null); return; }
+
+    // Build atomic update — both changes in one object
+    const key=`${activeStore}_${currentYear}_W${currentWeek}`;
+    // We need to read the current full schedule and apply both changes at once
+    // Get current schedule from AppContext state
+    const currentFull={...schedule};
+
+    if(dstShift){
+      // SWAP: src goes to dst, dst goes to src
+      currentFull[dstKey]={...srcShift};
+      currentFull[srcKey]={...dstShift};
+    } else {
+      // MOVE: src goes to dst, src becomes empty
+      currentFull[dstKey]={...srcShift};
+      delete currentFull[srcKey];
+    }
+
+    // Write both changes atomically
+    setBulkSchedule(activeStore,currentWeek,currentYear,currentFull);
+    dragSrcRef.current=null; setDragOver(null);
+  },[schedule,activeStore,currentWeek,currentYear,setBulkSchedule]);
+
+  const handleDragEnd=useCallback(()=>{
+    dragSrcRef.current=null; setDragOver(null);
+  },[]);
+
+  const handleBorrow=id=>{ setBorrowedEmps(prev=>[...prev,id]); setShowBorrow(false); };
+
+  return(
+    <div className="anim-up" style={{width:'100%'}}>
+      {/* HEADER */}
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:24,flexWrap:'wrap',gap:12}}>
+        <div>
+          <h1 className="page-title" style={{fontSize:34}}>📅 Plannings</h1>
+          <p className="page-sub" style={{fontSize:17}}>{store?.name||'—'} · <strong style={{color:'var(--teal-dark)'}}>S{currentWeek}</strong> · {allDisplayEmps.length} employé(s)</p>
+        </div>
+        <div style={{display:'flex',gap:9,flexWrap:'wrap',alignItems:'center'}}>
+          <WeekNav cw={currentWeek} setCw={setCurrentWeek}/>
+          <button className="btn btn-ghost btn-sm" onClick={()=>setShowWknd(!showWknd)}>{showWknd?'Masquer dim.':'Voir dim.'}</button>
+          {store&&storeEmps.length>0&&(<>
+            <button className="btn btn-sec btn-sm" disabled={generating} onClick={()=>setShowAuto(true)}>
+              {generating?'⏳ Génération...':'⚡ Auto-générer'}
+            </button>
+            <button className="btn btn-ghost btn-sm" style={{color:'#C8002B',borderColor:'#FFCCD4',gap:6}} onClick={()=>setShowClearConfirm(true)} title="Effacer tout le planning de cette semaine">
+              🗑 Effacer
+            </button>
+          </>)}
+          <button className="btn btn-sec btn-sm" onClick={()=>setShowBorrow(true)}>👥 Ajouter</button>
+          <button className="btn btn-primary btn-sm" onClick={()=>window.dispatchEvent(new CustomEvent('exportPDF',{detail:{storeId:activeStore,week:currentWeek}}))}>📄 PDF</button>
+          <button className="btn btn-ghost btn-sm" title="Copier le planning en image pour Notion" onClick={()=>window.dispatchEvent(new CustomEvent('exportNotion',{detail:{storeId:activeStore,week:currentWeek}}))}>🖼️ Notion</button>
+          {isDirigeant && <button className="btn btn-sec btn-sm" title="PDF de toutes les boutiques, une par page" onClick={()=>window.dispatchEvent(new CustomEvent('exportAllPlanning',{detail:{week:currentWeek}}))}>📚 PDF toutes boutiques</button>}
+        </div>
+      </div>
+
+      {/* STORE TABS */}
+      <div style={{display:'flex',gap:8,marginBottom:20,overflowX:'auto',paddingBottom:4}}>
+        {stores.map(s=>(
+          <button key={s.id} onClick={()=>setStore(s.id)} style={{
+            padding:'9px 18px',borderRadius:30,cursor:'pointer',flexShrink:0,
+            border:`2px solid ${activeStore===s.id?s.color:s.color+'40'}`,
+            background:activeStore===s.id?s.color:'#fff',
+            color:activeStore===s.id?'#fff':s.color,
+            fontFamily:'var(--font-b)',fontSize:14,fontWeight:activeStore===s.id?700:500,
+            transition:'all .22s cubic-bezier(.22,1,.36,1)',boxShadow:activeStore===s.id?`0 6px 18px ${s.color}55`:'none',transform:activeStore===s.id?'translateY(-2px)':'translateY(0)',
+          }}>{s.name}</button>
+        ))}
+        {manageableStores.length>1 && (
+          <button onClick={()=>setTeamView(v=>!v)} style={{
+            padding:'9px 18px',borderRadius:30,cursor:'pointer',flexShrink:0,
+            border:`2px solid ${teamView?'#0D9488':'#0D948840'}`,
+            background:teamView?'#0D9488':'#fff', color:teamView?'#fff':'#0D9488',
+            fontFamily:'var(--font-b)',fontSize:14,fontWeight:teamView?700:600,
+            transition:'all .22s',boxShadow:teamView?'0 6px 18px #0D948855':'none',
+          }}>👥 Vue équipe</button>
+        )}
+      </div>
+
+      {/* TILE PALETTE — click a tile then click cells to paint */}
+      {store && (
+        <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:14,flexWrap:'wrap',background:'var(--card2)',border:'1.5px solid var(--border)',borderRadius:12,padding:'10px 12px'}}>
+          <span style={{fontSize:13,fontWeight:700,color:'var(--muted)',marginRight:2}}>Remplissage rapide :</span>
+          {[
+            ['rest','Repos','#F5A623'],['vacation','Congé','#7C3AED'],['holiday','Férié 7h','#DC2626'],
+            ['school','École','#0EA5E9'],['exam','Examen 7h','#0D9488'],['meeting','Réunion','#16A34A'],['communication','Comm.','#EA580C'],
+            ['work7','Journée 7h','#00C9B1'],['work8','Journée 8h','#00A896'],
+          ].map(([t,lbl,col])=>{
+            const on=activeTile===t;
+            return (
+              <button key={t} onClick={()=>setActiveTile(on?null:t)} style={{
+                padding:'7px 13px',borderRadius:20,cursor:'pointer',
+                border:`2px solid ${on?col:col+'55'}`,background:on?col:'#fff',color:on?'#fff':col,
+                fontWeight:700,fontSize:13,transition:'all .15s'}}>
+                {lbl}
+              </button>
+            );
+          })}
+          {activeTile && <span style={{fontSize:12.5,color:'var(--teal-dark)',fontWeight:600,marginLeft:4}}>👆 Cliquez les cases à remplir · <button onClick={()=>setActiveTile(null)} style={{background:'none',border:'none',color:'#C8002B',cursor:'pointer',fontWeight:700,textDecoration:'underline',fontSize:12.5}}>Terminer</button></span>}
+          <div style={{flex:1}}/>
+          {storeEmps.length>0 && <button className="btn btn-ghost btn-sm" onClick={()=>setShowDuplicate(true)} title="Copier ce planning vers une autre semaine">📋 Dupliquer la semaine</button>}
+        </div>
+      )}
+
+      {/* VIEW TOGGLE + borrowed employees */}
+      <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:16,flexWrap:'wrap'}}>
+        <div style={{background:'var(--card2)',borderRadius:10,padding:3,border:'1px solid var(--border)',display:'inline-flex'}}>
+          {[['week','Semaine'],['day','Journée'],['month','Mois']].map(([m,label])=>(
+            <button key={m} onClick={()=>setViewMode(m)} style={{
+              padding:'8px 18px',borderRadius:8,border:'none',cursor:'pointer',
+              background:viewMode===m?'var(--teal)':'transparent',
+              color:viewMode===m?'#fff':'var(--muted)',
+              fontFamily:'var(--font-b)',fontSize:14,fontWeight:viewMode===m?700:500,
+            }}>{label}</button>
+          ))}
+        </div>
+        {viewMode==='day'&&weekDates.map((wd,i)=>(
+          <button key={i} onClick={()=>setActiveDay(i)} style={{
+            padding:'7px 13px',borderRadius:9,cursor:'pointer',
+            border:`2px solid ${activeDay===i?'var(--teal)':'var(--border)'}`,
+            background:activeDay===i?'var(--teal-light)':'#fff',
+            color:activeDay===i?'var(--teal-dark)':'var(--muted)',
+            fontFamily:'var(--font-b)',fontSize:13,fontWeight:activeDay===i?700:500,
+          }}>{wd.day.slice(0,3)} {wd.date.toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit'})}</button>
+        ))}
+        {extraEmps.length>0&&(
+          <div style={{display:'flex',gap:5,marginLeft:'auto',flexWrap:'wrap'}}>
+            {extraEmps.map(e=>(
+              <span key={e.id} style={{display:'flex',alignItems:'center',gap:5,background:'#FFF7E0',border:'1.5px solid #F5D06A',borderRadius:20,padding:'4px 10px',fontSize:12,color:'#B07D00',fontWeight:600}}>
+                ⚡{e.name}
+                <button onClick={()=>setBorrowedEmps(prev=>prev.filter(id=>id!==e.id))} style={{background:'none',border:'none',cursor:'pointer',fontSize:13,color:'#B07D00',lineHeight:1}}>✕</button>
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* LEGEND */}
+      <div style={{display:'flex',gap:7,marginBottom:18,flexWrap:'wrap'}}>
+        {shiftTypes.map(st=>(
+          <span key={st.id} style={{display:'inline-flex',alignItems:'center',gap:5,padding:'5px 12px',background:st.bgColor,borderRadius:20,border:`1.5px solid ${st.color}35`,fontSize:12,color:st.color,fontWeight:700}}>
+            <span style={{width:7,height:7,borderRadius:'50%',background:st.color,display:'inline-block'}}/>
+            {st.label}
+          </span>
+        ))}
+        <span style={{display:'inline-flex',alignItems:'center',gap:5,padding:'5px 12px',background:'var(--card2)',borderRadius:20,border:'1.5px solid var(--border)',fontSize:12,color:'var(--muted)'}}>
+          ↔ Glisser pour déplacer / échanger
+        </span>
+        <span style={{display:'inline-flex',alignItems:'center',gap:5,padding:'5px 12px',background:'var(--card2)',borderRadius:20,border:'1.5px solid var(--border)',fontSize:12,color:'var(--muted)'}}>
+          📋 Copier · 📌 Coller
+        </span>
+        {clipboard&&(
+          <span style={{display:'inline-flex',alignItems:'center',gap:8,padding:'5px 12px',background:'var(--teal-light)',borderRadius:20,border:'1.5px solid var(--teal-mid)',fontSize:12,color:'var(--teal-dark)',fontWeight:700}}>
+            📋 Copié : {clipboard.startTime?`${clipboard.startTime}–${clipboard.endTime}`:getMeta(shiftTypes,clipboard.type).label}
+            <button onClick={()=>setClipboard(null)} style={{background:'none',border:'none',cursor:'pointer',color:'var(--teal-dark)',fontSize:14,padding:0,lineHeight:1}}>✕</button>
+          </span>
+        )}
+      </div>
+
+      {/* ── LEAVE ALERTS BANNER ───────────────────────────────── */}
+      {weekLeaveAlerts.length>0&&(
+        <div style={{marginBottom:18}}>
+          {weekLeaveAlerts.map(({emp,req,days},i)=>{
+            const isApproved=req.status==='approved';
+            const isPending=req.status==='pending';
+            const dayNames=['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'];
+            const LEAVE_LABELS={vacation:'Congés payés',sick:'Maladie',personal:'Motif perso',training:'Formation'};
+            return(
+              <div key={i} style={{
+                display:'flex',alignItems:'flex-start',gap:14,
+                padding:'15px 20px',borderRadius:13,marginBottom:10,
+                background:isApproved?'#E8FAF0':isPending?'#FFF7E0':'#FFF0F2',
+                border:`1.5px solid ${isApproved?'var(--teal-mid)':isPending?'#F5D06A':'#FFAAB6'}`,
+              }}>
+                <div style={{width:36,height:36,borderRadius:'50%',background:emp.color||'var(--teal)',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:800,color:'#fff',fontSize:15,flexShrink:0}}>
+                  {emp.name[0]}
+                </div>
+                <div style={{flex:1}}>
+                  <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',marginBottom:4}}>
+                    <span style={{fontWeight:800,fontSize:16}}>{emp.name}</span>
+                    <span style={{
+                      background:isApproved?'#E8FAF0':isPending?'#FFF7E0':'#FFF0F2',
+                      color:isApproved?'#1A8A42':isPending?'#B07D00':'#C8002B',
+                      border:`1.5px solid ${isApproved?'var(--teal)':isPending?'#F5D06A':'#FFAAB6'}`,
+                      borderRadius:20,padding:'4px 12px',fontSize:13,fontWeight:700,
+                    }}>
+                      {isApproved?'✅ Congé approuvé':isPending?'⏳ En attente de validation':'❌ Refusé'}
+                    </span>
+                    <span style={{fontSize:13,color:'var(--muted)'}}>
+                      {LEAVE_LABELS[req.type]||req.type}
+                    </span>
+                  </div>
+                  <div style={{display:'flex',gap:5,flexWrap:'wrap'}}>
+                    {days.map(di=>(
+                      <span key={di} style={{
+                        background:'white',borderRadius:6,padding:'2px 8px',fontSize:12,fontWeight:600,
+                        color:isApproved?'var(--teal-dark)':isPending?'#B07D00':'#C8002B',
+                        border:`1px solid ${isApproved?'var(--teal-mid)':isPending?'#F5D06A':'#FFAAB6'}`,
+                      }}>
+                        {dayNames[di]||`Jour ${di}`}
+                      </span>
+                    ))}
+                  </div>
+                  {isPending&&(
+                    <div style={{fontSize:12,color:'#B07D00',marginTop:4,fontStyle:'italic'}}>
+                      ⚠️ Non validé — non intégré dans la génération automatique
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {generating&&(
+        <div style={{textAlign:'center',padding:'32px',background:'var(--teal-light)',borderRadius:14,marginBottom:16,border:'2px solid var(--teal-mid)'}}>
+          <div style={{fontSize:28,marginBottom:8,animation:'spin 1s linear infinite',display:'inline-block'}}>⚡</div>
+          <p style={{color:'var(--teal-dark)',fontWeight:700,fontSize:15}}>Génération en cours...</p>
+        </div>
+      )}
+      {teamView && manageableStores.length>1 && (
+        <MultiStoreTeamView
+          stores={manageableStores} employees={employees} weekDates={weekDates}
+          getSchedule={getSchedule} currentWeek={currentWeek} currentYear={currentYear}
+          types={shiftTypes} onGoToStore={(sid)=>{setTeamView(false);setStore(sid);}}
+        />
+      )}
+      {!teamView && !generating&&allDisplayEmps.length===0&&(
+        <div style={{textAlign:'center',padding:'60px 20px',background:'#fff',border:'2px dashed var(--border)',borderRadius:14}}>
+          <div style={{fontSize:48,marginBottom:12}}>👥</div>
+          <p style={{color:'var(--muted)',fontWeight:600,fontSize:15}}>Aucun employé dans ce magasin</p>
+        </div>
+      )}
+      {!teamView && !generating&&allDisplayEmps.length>0&&(
+        viewMode==='month'
+          ?<MonthManagerView
+              emps={allDisplayEmps} storeId={activeStore} currentWeek={currentWeek}
+              currentYear={currentYear} getSchedule={getSchedule} types={shiftTypes}
+              onCell={handleCell} stores={stores} totalH={totalH}
+              getWeekDates={getWeekDatesForCurrentWeek}
+              overtimeRecords={overtimeRecords} onOvertimeClick={(empId)=>setOvertimeModal({empId})}
+          />
+          : viewMode==='week'
+            ?<WeekView
+              emps={allDisplayEmps} days={displayDays} allDays={weekDates}
+              sched={schedule} types={shiftTypes} onCell={handleCell} totalH={totalH}
+              onDragStart={handleDragStart} onDragOver={handleDragOver}
+              onDrop={handleDrop} onDragEnd={handleDragEnd}
+              dragOver={dragOver} extraEmpIds={extraEmps.map(e=>e.id)} allStores={stores} activeStoreId={activeStore} getContractH={getContractH}
+              overtimeRecords={overtimeRecords} onOvertimeClick={(empId)=>setOvertimeModal({empId})}
+              clipboard={clipboard} onCopyShift={handleCopyShift} onPasteShift={handlePasteShift}
+            />
+            :<DayView
+              emps={allDisplayEmps} day={weekDates[activeDay]} dayIdx={activeDay}
+              sched={schedule} types={shiftTypes} onCell={handleCell}
+              onDragStart={handleDragStart} onDragOver={handleDragOver}
+              onDrop={handleDrop} onDragEnd={handleDragEnd}
+              dragOver={dragOver}
+            />
+      )}
+
+      {/* MODALS */}
+      {editCell&&(()=>{
+        const emp=employees.find(e=>e.id===editCell.empId);
+        const sh=schedule[`${editCell.empId}_${editCell.dayIdx}`];
+        return <ShiftModal emp={emp} dayIdx={editCell.dayIdx} day={weekDates[editCell.dayIdx]} shift={sh} onSave={handleSave} onDelete={handleDelete} onClose={()=>setEditCell(null)} types={shiftTypes} allStores={manageableStores} activeStoreId={activeStore}/>;
+      })()}
+      {confirmWknd&&(
+        <div className="overlay" onClick={()=>setConfirmWknd(null)}>
+          <div className="modal" style={{maxWidth:480,textAlign:'center'}} onClick={ev=>ev.stopPropagation()}>
+            <div style={{fontSize:44,marginBottom:12}}>⚠️</div>
+            <h3 style={{fontFamily:'var(--font-h)',fontWeight:800,fontSize:19,marginBottom:9}}>Jour non travaillé</h3>
+            <p style={{color:'var(--muted)',fontSize:14,marginBottom:20}}>Ce jour est un dimanche. Planifier quand même ?</p>
+            <div style={{display:'flex',gap:10,justifyContent:'center'}}>
+              <button className="btn btn-ghost" onClick={()=>setConfirmWknd(null)}>Annuler</button>
+              <button className="btn btn-danger" onClick={()=>{ setShowWknd(true); setEditCell(confirmWknd); setConfirmWknd(null); }}>Confirmer</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {detailPopup&&(()=>{
+        const emp=employees.find(e=>e.id===detailPopup.empId);
+        const sh=schedule[`${detailPopup.empId}_${detailPopup.dayIdx}`];
+        const day=weekDates[detailPopup.dayIdx];
+        return <ShiftDetailPopup
+          emp={emp} day={day} shift={sh}
+          onClose={()=>setDetailPopup(null)}
+          types={shiftTypes}
+          onEdit={()=>{ setDetailPopup(null); setEditCell(detailPopup); }}
+        />;
+      })()}
+      {overtimeModal&&(()=>{
+        const emp=employees.find(e=>e.id===overtimeModal.empId);
+        if(!emp) return null;
+        return <OvertimeModal
+          emp={emp} schedule={schedule} weekDates={weekDates}
+          currentWeek={currentWeek} currentYear={currentYear}
+          overtimeRecords={overtimeRecords} resolveOvertime={resolveOvertime}
+          deleteOvertimeEntry={deleteOvertimeEntry} updateOvertimeHours={updateOvertimeHours}
+          onClose={()=>setOvertimeModal(null)}
+          isManager={['manager','dirigeant','admin'].includes(authRole)}
+        />;
+      })()}
+      {showClearConfirm&&(
+        <div className="overlay" onClick={()=>setShowClearConfirm(false)}>
+          <div className="modal" style={{maxWidth:480,textAlign:'center'}} onClick={e=>e.stopPropagation()}>
+            <div style={{fontSize:52,marginBottom:16}}>🗑️</div>
+            <h3 style={{fontFamily:'var(--font-h)',fontWeight:800,fontSize:22,marginBottom:10}}>Effacer le planning ?</h3>
+            <p style={{color:'var(--muted)',fontSize:16,marginBottom:8}}>
+              Tous les créneaux de <strong style={{color:'var(--text)'}}>{store?.name}</strong> pour la semaine <strong style={{color:'var(--teal-dark)'}}>S{currentWeek}</strong> seront supprimés.
+            </p>
+            <p style={{color:'#C8002B',fontSize:14,marginBottom:24,fontWeight:600}}>⚠️ Cette action est irréversible.</p>
+            <div style={{display:'flex',gap:12,justifyContent:'center'}}>
+              <button className="btn btn-danger" style={{padding:'13px 28px',fontSize:15}} onClick={handleClearPlanning}>
+                🗑 Confirmer — Effacer
+              </button>
+              <button className="btn btn-ghost" style={{padding:'13px 24px',fontSize:15}} onClick={()=>setShowClearConfirm(false)}>
+                Annuler
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {dayChooser&&(
+        <div className="overlay" onClick={()=>setDayChooser(null)}>
+          <div className="modal" onClick={e=>e.stopPropagation()} style={{maxWidth:380,textAlign:'center'}}>
+            <h3 style={{fontFamily:'var(--font-h)',fontWeight:800,fontSize:19,marginBottom:6}}>Journée de {dayChooser.hours}h</h3>
+            <p style={{fontSize:14,color:'var(--muted)',marginBottom:18}}>Placer sur l'ouverture ou la fermeture du magasin ?</p>
+            <div style={{display:'flex',gap:10}}>
+              <button className="btn btn-primary" style={{flex:1,justifyContent:'center',padding:'13px'}} onClick={()=>applyWorkDay(dayChooser.empId,dayChooser.dayIdx,dayChooser.hours,'open')}>🌅 Ouverture</button>
+              <button className="btn btn-sec" style={{flex:1,justifyContent:'center',padding:'13px'}} onClick={()=>applyWorkDay(dayChooser.empId,dayChooser.dayIdx,dayChooser.hours,'close')}>🌙 Fermeture</button>
+            </div>
+            <button className="btn btn-ghost btn-sm" style={{marginTop:12}} onClick={()=>setDayChooser(null)}>Annuler</button>
+          </div>
+        </div>
+      )}
+      {showDuplicate&&store&&<DuplicateWeekModal currentWeek={currentWeek} currentYear={currentYear} onDuplicate={handleDuplicateWeek} onClose={()=>setShowDuplicate(false)}/>}
+      {showAuto&&store&&<AutoModal store={store} emps={storeEmps} allEmployees={employees} manageableStores={manageableStores} weekDates={weekDates} currentWeek={currentWeek} currentYear={currentYear} leaveRequests={leaveRequests} onGenerate={handleAutoGen} onClose={()=>setShowAuto(false)}/>}
+      {showBorrow&&store&&<BorrowModal store={store} allEmployees={employees} allStores={stores} currentEmps={allDisplayEmps} onBorrow={handleBorrow} onClose={()=>setShowBorrow(false)}/>}
+    </div>
+  );
+}
+
+/* ── OVERTIME MODAL ──────────────────────────────────────── */
+function OvertimeModal({emp,schedule,weekDates,currentWeek,currentYear,overtimeRecords,resolveOvertime,deleteOvertimeEntry,updateOvertimeHours,onClose,isManager}){
+  const { effectiveContractHours } = useApp();
+  const workTypes=['work','communication','meeting','school'];
+  const MONTHS=['Jan','Fév','Mar','Avr','Mai','Jun','Jul','Aoû','Sep','Oct','Nov','Déc'];
+  const workedH=weekDates.reduce((t,_,di)=>{
+    const sh=schedule[`${emp.id}_${di}`];
+    if(!sh) return t;
+    let h=0;
+    if(workTypes.includes(sh.type)) h+=mainHours(sh);
+    if(sh.split&&workTypes.includes(sh.split.type)) h+=splitHours(sh);
+    // Jours fériés et examens comptent comme 7h travaillées (heures supp possibles malgré un férié)
+    if(sh.type==='holiday'||sh.type==='exam') h+=(Number(sh.hours)||7);
+    return t+h;
+  },0);
+  const contractH=effectiveContractHours(emp,currentWeek,currentYear);
+  const thisWeekExtra=parseFloat(Math.max(0,workedH-contractH).toFixed(2));
+  const empRecords=Object.values(overtimeRecords).filter(r=>r.empId===emp.id).sort((a,b)=>b.year-a.year||b.month-a.month);
+  const pendingTotal=empRecords.filter(r=>r.status!=='paid').reduce((t,r)=>t+(r.extraHours||0),0);
+  const[action,setAction]=useState('accumulate');
+  const[saving,setSaving]=useState(false);
+  const[payMonth,setPayMonth]=useState(null);
+  const[editRecord,setEditRecord]=useState(null);
+  const[deleteConfirm,setDeleteConfirm]=useState(null);
+  const[manualH,setManualH]=useState(0);
+  const[manualDir,setManualDir]=useState('add');
+  const[manualNote,setManualNote]=useState('');
+  const[showManual,setShowManual]=useState(false);
+  const handleResolve=async()=>{
+    if(thisWeekExtra<=0) return;
+    setSaving(true);
+    await resolveOvertime(emp.id,currentWeek,currentYear,action,thisWeekExtra);
+    setSaving(false); onClose();
+  };
+  return(
+    <div className="overlay" onClick={onClose}>
+      <div className="modal" style={{maxWidth:820}} onClick={e=>e.stopPropagation()}>
+        <div style={{display:'flex',alignItems:'center',gap:16,marginBottom:26}}>
+          <div style={{width:58,height:58,borderRadius:'50%',background:emp.color||'var(--teal)',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:800,color:'#fff',fontSize:25,flexShrink:0}}>
+            {emp.name[0]}
+          </div>
+          <div style={{flex:1}}>
+            <h3 style={{fontFamily:'var(--font-h)',fontWeight:800,fontSize:26}}>{emp.name}</h3>
+            <p style={{color:'var(--muted)',fontSize:16,marginTop:3}}>Heures supplémentaires · Contrat {contractH}h/sem</p>
+          </div>
+          <button className="btn btn-ghost btn-xs" onClick={onClose}>✕</button>
+        </div>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:14,marginBottom:24}}>
+          {[
+            {l:'Travaillé',v:fmtH(workedH),s:`S${currentWeek}`,bg:'var(--teal-light)',b:'var(--teal-mid)',c:'var(--teal-dark)'},
+            {l:'Supp. sem.',v:`${thisWeekExtra>0?'+':''}${fmtH(thisWeekExtra)}`,s:'vs contrat',bg:thisWeekExtra>0?'#E8FAF0':'var(--card2)',b:thisWeekExtra>0?'var(--teal-mid)':'var(--border)',c:thisWeekExtra>0?'#1A8A42':'var(--dim)'},
+            {l:'Solde total',v:`+${fmtH(pendingTotal)}`,s:'à régulariser',bg:pendingTotal>0?'#FFF7E0':'var(--card2)',b:pendingTotal>0?'#F5D06A':'var(--border)',c:pendingTotal>0?'#B07D00':'var(--dim)'},
+          ].map((s,i)=>(
+            <div key={i} style={{background:s.bg,border:`2px solid ${s.b}`,borderRadius:14,padding:'16px 12px',textAlign:'center'}}>
+              <div style={{fontSize:12,fontWeight:700,color:s.c,textTransform:'uppercase',letterSpacing:'.05em',marginBottom:6}}>{s.l}</div>
+              <div className="num" style={{fontFamily:'var(--font-b)',fontWeight:800,fontSize:30,color:s.c,lineHeight:1}}>{s.v}</div>
+              <div style={{fontSize:13,color:'var(--muted)',marginTop:4}}>{s.s}</div>
+            </div>
+          ))}
+        </div>
+        {/* Manual overtime add/remove (manager only) */}
+        {isManager&&(
+          <div style={{marginBottom:20}}>
+            <button onClick={()=>setShowManual(v=>!v)} style={{display:'flex',alignItems:'center',gap:8,background:'none',border:'1.5px solid var(--border)',borderRadius:10,padding:'9px 16px',cursor:'pointer',fontSize:14,fontWeight:600,color:'var(--muted)',fontFamily:'var(--font-b)',width:'100%',justifyContent:'space-between'}}>
+              <span>✏️ Ajustement manuel des heures</span>
+              <span style={{fontSize:18}}>{showManual?'▲':'▼'}</span>
+            </button>
+            {showManual&&(
+              <div style={{background:'var(--card2)',borderRadius:12,padding:'16px',marginTop:8,border:'1.5px solid var(--border)'}}>
+                <p style={{fontSize:13,color:'var(--muted)',marginBottom:14}}>Ajoutez ou retirez des heures supplémentaires manuellement avec une note.</p>
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:12}}>
+                  <div>
+                    <div className="lbl">Action</div>
+                    <div style={{display:'flex',gap:6}}>
+                      {[['add','+ Ajouter'],['remove','- Retirer']].map(([v,l])=>(
+                        <button key={v} onClick={()=>setManualDir(v)} style={{flex:1,padding:'10px',borderRadius:9,border:`2px solid ${manualDir===v?'var(--teal)':'var(--border)'}`,background:manualDir===v?'var(--teal-light)':'#fff',color:manualDir===v?'var(--teal-dark)':'var(--muted)',fontFamily:'var(--font-b)',fontSize:14,fontWeight:700,cursor:'pointer'}}>{l}</button>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="lbl">Heures</div>
+                    <div style={{display:'flex',alignItems:'center',gap:8}}>
+                      <button onClick={()=>setManualH(h=>Math.max(0,parseFloat((h-0.5).toFixed(2))))} style={{width:36,height:44,borderRadius:8,border:'1.5px solid var(--border)',background:'#fff',fontSize:20,cursor:'pointer',fontFamily:'var(--font-b)'}}>-</button>
+                      <input type="number" step="0.5" min="0" max="100" value={manualH} onChange={e=>setManualH(parseFloat(e.target.value)||0)} className="inp" style={{textAlign:'center',fontSize:18,fontWeight:700,padding:'10px'}}/>
+                      <button onClick={()=>setManualH(h=>parseFloat((h+0.5).toFixed(2)))} style={{width:36,height:44,borderRadius:8,border:'1.5px solid var(--border)',background:'#fff',fontSize:20,cursor:'pointer',fontFamily:'var(--font-b)'}}>+</button>
+                    </div>
+                  </div>
+                </div>
+                <div style={{marginBottom:12}}>
+                  <div className="lbl">Note / raison <span style={{color:'#C8002B'}}>*</span></div>
+                  <input className="inp" value={manualNote} onChange={e=>setManualNote(e.target.value)} placeholder="Ex: rattrapage erreur saisie, bonus exceptionnel..."/>
+                </div>
+                <button className="btn btn-primary btn-sm" style={{width:'100%',justifyContent:'center',padding:'12px',fontSize:15}}
+                  disabled={manualH<=0||!manualNote.trim()||saving}
+                  onClick={async()=>{
+                    if(manualH<=0||!manualNote.trim()) return;
+                    setSaving(true);
+                    const month=Math.ceil(currentWeek/4.33);
+                    const key=`${emp.id}_${currentYear}_M${month}`;
+                    const existing=overtimeRecords[key]||{extraHours:0,weeks:[],status:'pending'};
+                    const delta=manualDir==='add'?manualH:-manualH;
+                    await updateOvertimeHours(emp.id,currentYear,month,Math.max(0,(existing.extraHours||0)+delta));
+                    setSaving(false); setManualH(0); setManualNote(''); setShowManual(false);
+                  }}>
+                  {saving?'⏳ ...':`${manualDir==='add'?'+ Ajouter':'- Retirer'} ${fmtH(manualH)} heures`}
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {empRecords.length>0&&(
+          <div style={{marginBottom:18}}>
+            <div style={{fontFamily:'var(--font-h)',fontWeight:700,fontSize:19,marginBottom:14}}>📊 Historique des heures supp.</div>
+            {empRecords.map((r,i)=>{
+              const isEditing=editRecord?.month===r.month&&editRecord?.year===r.year;
+              return(
+                <div key={i} style={{background:r.status==='paid'?'#E8FAF0':'#FFF7E0',border:`1.5px solid ${r.status==='paid'?'var(--teal-mid)':'#F5D06A'}`,borderRadius:13,marginBottom:9,overflow:'hidden'}}>
+                  <div style={{display:'flex',alignItems:'center',gap:14,padding:'16px 18px'}}>
+                    <span style={{fontSize:26,flexShrink:0}}>{r.status==='paid'?'✅':'⏳'}</span>
+                    <div style={{flex:1}}>
+                      <div style={{fontWeight:700,fontSize:17}}>{MONTHS[r.month-1]} {r.year}</div>
+                      <div style={{fontSize:14,color:'var(--muted)',marginTop:2}}>{r.weeks?.length||0} sem. · {r.status==='paid'?'✅ Validé en heures supp':'⏳ En attente'}</div>
+                    </div>
+                    <div className="num" style={{fontFamily:'var(--font-b)',fontWeight:800,fontSize:24,color:r.status==='paid'?'#1A8A42':'#B07D00',marginRight:6}}>+{fmtH(r.extraHours||0)}</div>
+                    {isManager&&(
+                      <div style={{display:'flex',gap:6,flexShrink:0}}>
+                        {r.status!=='paid'&&(r.extraHours||0)>0&&(
+                          <button className="btn btn-sm" onClick={()=>setPayMonth(r)}
+                            style={{background:'#1A8A42',color:'#fff',border:'none',fontSize:13,fontWeight:700,borderRadius:8}}>
+                            ✓ Valider
+                          </button>
+                        )}
+                        {r.status!=='paid'&&(
+                          <button className="btn btn-sm" onClick={()=>setEditRecord(isEditing?null:{...r,editH:r.extraHours})}
+                            style={{background:'#EBF8FF',color:'#1D6FD8',border:'1px solid #B3E0FF',fontSize:13,fontWeight:700,borderRadius:8}}>
+                            ✏️
+                          </button>
+                        )}
+                        <button className="btn btn-sm btn-danger" onClick={()=>setDeleteConfirm(r)}
+                          style={{fontSize:13,fontWeight:700,borderRadius:8}}>
+                          🗑
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                  {/* Inline edit panel */}
+                  {isEditing&&(
+                    <div style={{padding:'12px 16px 14px',background:'rgba(255,255,255,.7)',borderTop:'1px solid rgba(0,0,0,.06)'}}>
+                      <div className="lbl" style={{marginBottom:8}}>Modifier les heures</div>
+                      <div style={{display:'flex',gap:10,alignItems:'center'}}>
+                        <input type="number" step="0.5" min="0" max="100"
+                          value={editRecord.editH}
+                          onChange={e=>setEditRecord(prev=>({...prev,editH:parseFloat(e.target.value)||0}))}
+                          className="inp" style={{maxWidth:120,fontSize:18,fontWeight:700,textAlign:'center'}}
+                        />
+                        <span style={{fontSize:16,color:'var(--muted)'}}>heures</span>
+                        <button className="btn btn-primary btn-sm" style={{marginLeft:'auto'}}
+                          onClick={async()=>{
+                            setSaving(true);
+                            await updateOvertimeHours(emp.id,r.year,r.month,editRecord.editH);
+                            setEditRecord(null);
+                            setSaving(false);
+                          }} disabled={saving}>
+                          {saving?'⏳':'✓ Sauvegarder'}
+                        </button>
+                        <button className="btn btn-ghost btn-sm" onClick={()=>setEditRecord(null)}>Annuler</button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+        {payMonth&&(
+          <div style={{background:'#E8FAF0',borderRadius:13,padding:'16px 18px',border:'2px solid var(--teal-mid)',marginBottom:14}}>
+            <div style={{fontWeight:700,fontSize:16,color:'#1A8A42',marginBottom:12}}>
+              ✅ Valider {fmtH(payMonth.extraHours||0)} supp pour {MONTHS[payMonth.month-1]} {payMonth.year} ?
+            </div>
+            <div style={{fontSize:14,color:'var(--muted)',marginBottom:12}}>Ces heures seront marquées comme payées et ne s'accumuleront plus.</div>
+            <div style={{display:'flex',gap:10}}>
+              <button className="btn btn-sm" style={{background:'#1A8A42',color:'#fff',border:'none',fontSize:14,padding:'10px 18px'}}
+                onClick={async()=>{
+                  setSaving(true);
+                  // Mark as paid: update status to 'paid' in the record
+                  const key=`${emp.id}_${payMonth.year}_M${payMonth.month}`;
+                  const rec=overtimeRecords[key];
+                  if(rec){
+                    // Use resolveOvertime with pay action (it will mark as paid)
+                    await resolveOvertime(emp.id,currentWeek,currentYear,'pay',0);
+                  }
+                  setSaving(false); setPayMonth(null); onClose();
+                }}>
+                {saving?'⏳ ...':'✓ Confirmer le paiement'}
+              </button>
+              <button className="btn btn-ghost btn-sm" style={{fontSize:14}} onClick={()=>setPayMonth(null)}>Annuler</button>
+            </div>
+          </div>
+        )}
+
+        {deleteConfirm&&(
+          <div style={{background:'#FFF0F2',borderRadius:13,padding:'16px 18px',border:'2px solid #FFCCD4',marginBottom:14}}>
+            <div style={{fontWeight:700,fontSize:16,color:'#C8002B',marginBottom:8}}>
+              🗑 Supprimer {fmtH(deleteConfirm.extraHours||0)} de {MONTHS[deleteConfirm.month-1]} {deleteConfirm.year} ?
+            </div>
+            <div style={{fontSize:14,color:'var(--muted)',marginBottom:12}}>Cette action est irréversible. Les heures supplémentaires seront supprimées définitivement.</div>
+            <div style={{display:'flex',gap:10}}>
+              <button className="btn btn-danger btn-sm" style={{fontSize:14,padding:'10px 18px'}}
+                onClick={async()=>{
+                  setSaving(true);
+                  await deleteOvertimeEntry(emp.id,deleteConfirm.year,deleteConfirm.month);
+                  setSaving(false); setDeleteConfirm(null);
+                }}>
+                {saving?'⏳ ...':'🗑 Supprimer définitivement'}
+              </button>
+              <button className="btn btn-ghost btn-sm" style={{fontSize:14}} onClick={()=>setDeleteConfirm(null)}>Annuler</button>
+            </div>
+          </div>
+        )}
+        {isManager&&thisWeekExtra>0&&!payMonth&&(
+          <div style={{background:'var(--card2)',borderRadius:16,padding:'20px',border:'1.5px solid var(--border)'}}>
+            <div style={{fontFamily:'var(--font-h)',fontWeight:700,fontSize:18,marginBottom:14}}>⚡ Action pour S{currentWeek} (+{thisWeekExtra}h)</div>
+            {[
+              {v:'accumulate',icon:'📅',l:"Conserver jusqu'à fin de mois",s:'Accumulation mensuelle'},
+              {v:'deduct',icon:'🔄',l:'Déduire (repos compensation)',s:'Cette semaine'},
+              {v:'pay',icon:'💰',l:'Valider en heures supp',s:'Paiement immédiat'},
+            ].map(opt=>(
+              <button key={opt.v} onClick={()=>setAction(opt.v)} style={{
+                display:'flex',alignItems:'center',gap:14,padding:'15px 17px',borderRadius:12,cursor:'pointer',textAlign:'left',width:'100%',marginBottom:9,
+                border:`2px solid ${action===opt.v?'var(--teal)':'var(--border)'}`,
+                background:action===opt.v?'var(--teal-light)':'#fff',fontFamily:'var(--font-b)',transition:'all .15s',
+              }}>
+                <span style={{fontSize:24,flexShrink:0}}>{opt.icon}</span>
+                <div>
+                  <div style={{fontWeight:700,fontSize:16,color:action===opt.v?'var(--teal-dark)':'var(--text)'}}>{opt.l}</div>
+                  <div style={{fontSize:14,color:'var(--muted)',marginTop:1}}>{opt.s}</div>
+                </div>
+              </button>
+            ))}
+            <button className="btn btn-primary" style={{width:'100%',justifyContent:'center',padding:'16px',fontSize:17,borderRadius:12,marginTop:6}}
+              onClick={handleResolve} disabled={saving}>{saving?'⏳ ...':'✓ Confirmer'}</button>
+          </div>
+        )}
+        {!isManager&&<div style={{background:'var(--card2)',borderRadius:12,padding:'13px',border:'1px solid var(--border)',textAlign:'center',color:'var(--muted)',fontSize:14,marginTop:10}}>👔 Contactez votre manager</div>}
+      </div>
+    </div>
+  );
+}
+
+/* ── OVERTIME TOTAL CELL ─────────────────────────────────── */
+function OvertimeTotalCell({t,diff,emp,overtimeRecords,onOvertimeClick}){
+  // Calcul solde heures supp
+  const allEmpRec = Object.values(overtimeRecords||{}).filter(r=>r.empId===emp.id);
+  const pendingSaved = allEmpRec.filter(r=>r.status!=='paid').reduce((s,r)=>s+(r.extraHours||0),0);
+  const pendingPaid  = allEmpRec.filter(r=>r.status==='paid').reduce((s,r)=>s+(r.extraHours||0),0);
+  const thisWeekExtra = parseFloat(Math.max(0,diff).toFixed(2));
+  const totalSaved    = parseFloat((pendingSaved).toFixed(2));
+
+  return(
+    <td style={{padding:'6px 6px',textAlign:'center',minWidth:110}}>
+      <button onClick={()=>onOvertimeClick(emp.id)} style={{
+        background:'none',border:'none',cursor:'pointer',
+        display:'flex',flexDirection:'column',alignItems:'center',gap:4,
+        padding:'6px 4px',borderRadius:12,width:'100%',
+        transition:'all .18s cubic-bezier(.22,1,.36,1)',
+      }}
+        onMouseEnter={e=>{e.currentTarget.style.background='var(--card2)';e.currentTarget.style.transform='scale(1.04)';}}
+        onMouseLeave={e=>{e.currentTarget.style.background='none';e.currentTarget.style.transform='scale(1)';}}
+        title="Cliquer pour gérer les heures supp"
+      >
+        {/* Heures totales */}
+        <div style={{
+          fontFamily:'var(--font-b)',fontWeight:800,fontSize:22,lineHeight:1,fontVariantNumeric:'tabular-nums lining-nums',letterSpacing:0,
+          color:diff>0.5?'#C8002B':diff<-0.5?'var(--muted)':'var(--teal-dark)',
+        }}>{fmtH(t)}</div>
+
+        {/* Diff semaine */}
+        <div style={{
+          fontSize:14,fontWeight:800,lineHeight:1,
+          color:Math.abs(diff)<0.02?'var(--teal-dark)':diff>0?'#C8002B':'#1A8A42',
+        }}>{diff>0?'+':diff<0?'-':''}{fmtH(Math.abs(diff))}</div>
+
+        {/* Badge solde accumulé */}
+        {totalSaved>0&&(
+          <div style={{
+            background:'linear-gradient(135deg,#F59E0B,#F97316)',
+            color:'#fff',borderRadius:7,padding:'3px 7px',
+            fontSize:10,fontWeight:800,lineHeight:1.2,
+            display:'flex',alignItems:'center',gap:2,
+            boxShadow:'0 2px 8px rgba(249,115,22,.4)',
+          }}>
+            📅 +{fmtH(totalSaved)}
+          </div>
+        )}
+
+        {/* Cette semaine en extra */}
+        {thisWeekExtra>0&&(
+          <div style={{
+            background:'linear-gradient(135deg,#C8002B,#E53935)',
+            color:'#fff',borderRadius:7,padding:'3px 7px',
+            fontSize:10,fontWeight:800,lineHeight:1.2,
+            display:'flex',alignItems:'center',gap:2,
+            boxShadow:'0 2px 8px rgba(200,0,43,.35)',
+          }}>
+            ⚡ +{fmtH(thisWeekExtra)}
+          </div>
+        )}
+      </button>
+    </td>
+  );
+}
+
+/* ── MONTH VIEW (MANAGER) ────────────────────────────────── */
+// Consolidated read-only view: all employees across managed stores, where each works per day
+function MultiStoreTeamView({stores,employees,weekDates,getSchedule,currentWeek,currentYear,types,onGoToStore}){
+  const WORK=['work','communication','meeting','school','exam'];
+  const dayNames=['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'];
+  const stMap={}; types.forEach(t=>stMap[t.id]=t);
+  // Preload all managed stores' schedules for the week
+  const scheds={};
+  stores.forEach(s=>{ scheds[s.id]=getSchedule(s.id,currentWeek,currentYear)||{}; });
+  // Employees whose home store is one of the managed stores
+  const storeIds=new Set(stores.map(s=>s.id));
+  const _teamMonday = weekDates[0]?.date;
+  const _teamActive = (e)=>{ if(!e.endDate) return true; if(!_teamMonday) return true; return _teamMonday <= new Date(e.endDate+'T23:59:59'); };
+  const emps=employees.filter(e=>storeIds.has(e.storeId)&&(e.role==='vendeur'||e.role==='manager')&&_teamActive(e))
+    .sort((a,b)=>a.name.localeCompare(b.name));
+
+  // For an employee on a day, find where they are: scan all managed stores
+  const locate=(empId,di)=>{
+    for(const s of stores){
+      const sh=scheds[s.id][`${empId}_${di}`];
+      if(sh) return {store:s, sh};
+    }
+    return null;
+  };
+
+  return (
+    <div className="anim-up" style={{overflowX:'auto'}}>
+      <div style={{background:'#0D948810',border:'1.5px solid #0D948840',borderRadius:12,padding:'12px 14px',marginBottom:14}}>
+        <div style={{fontSize:14,fontWeight:800,color:'#0A7367'}}>👥 Vue équipe — {stores.map(s=>s.name).join(' · ')}</div>
+        <div style={{fontSize:12.5,color:'var(--muted)',marginTop:3}}>Où et quand sont vos vendeurs cette semaine, toutes vos boutiques réunies. Cliquez une case pour ouvrir la boutique concernée.</div>
+      </div>
+      <div style={{minWidth:'fit-content'}}>
+        <div style={{display:'grid',gridTemplateColumns:'170px repeat(7,1fr)',gap:4,marginBottom:6}}>
+          <div style={{fontSize:12,fontWeight:800,color:'var(--muted)'}}>Employé</div>
+          {weekDates.map((wd,di)=>(
+            <div key={di} style={{textAlign:'center',fontSize:12,fontWeight:700,color:wd.date.getDay()===0?'#C8002B':'var(--muted)'}}>
+              {dayNames[di]} {wd.date.getDate()}
+            </div>
+          ))}
+        </div>
+        {emps.map(emp=>{
+          const home=stores.find(s=>s.id===emp.storeId);
+          return (
+            <div key={emp.id} style={{display:'grid',gridTemplateColumns:'170px repeat(7,1fr)',gap:4,marginBottom:4}}>
+              <div style={{display:'flex',alignItems:'center',gap:7,overflow:'hidden'}}>
+                <div style={{width:26,height:26,borderRadius:'50%',background:emp.color||home?.color||'#00C9B1',color:'#fff',display:'flex',alignItems:'center',justifyContent:'center',fontSize:12,fontWeight:700,flexShrink:0}}>{emp.name[0]}</div>
+                <div style={{minWidth:0}}>
+                  <div style={{fontSize:13,fontWeight:700,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{emp.name}</div>
+                  <div style={{fontSize:10,color:'var(--muted)',whiteSpace:'nowrap'}}>{home?.name||'—'}</div>
+                </div>
+              </div>
+              {weekDates.map((wd,di)=>{
+                const loc=locate(emp.id,di);
+                if(!loc) return <div key={di} style={{minHeight:46,borderRadius:8,background:'var(--card2)',border:'1px solid var(--border)'}}/>;
+                const {store:st,sh}=loc;
+                const meta=stMap[sh.type]||{label:sh.type,color:'#6366F1',bgColor:'#EEF2FF'};
+                const isWork=WORK.includes(sh.type);
+                const away=st.id!==emp.storeId;
+                return (
+                  <div key={di} onClick={()=>onGoToStore(st.id)} title={`Ouvrir ${st.name}`} style={{minHeight:46,borderRadius:8,cursor:'pointer',background:isWork?st.color+'14':meta.bgColor,border:`1.5px solid ${isWork?st.color+'55':meta.color+'40'}`,padding:'5px 4px',textAlign:'center',display:'flex',flexDirection:'column',justifyContent:'center',gap:1}}>
+                    {isWork?(
+                      <>
+                        <div style={{fontSize:11,fontWeight:800,color:st.color,lineHeight:1.05}}>{away?`✈ ${st.name}`:st.name}</div>
+                        {sh.startTime&&<div style={{fontSize:10,color:'var(--muted)'}}>{sh.startTime}–{sh.endTime}</div>}
+                      </>
+                    ):(
+                      <div style={{fontSize:11,fontWeight:700,color:meta.color}}>{meta.label}</div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function MonthManagerView({emps,storeId,currentWeek,currentYear,getSchedule,types,onCell,stores,totalH,getWeekDates,overtimeRecords,onOvertimeClick}){
+  const getMeta=id=>types.find(t=>t.id===id)||{label:id,color:'#6366F1',bgColor:'#EEF2FF'};
+  const WORK=['work','communication','meeting','school'];
+  const DAY_S=['L','M','M','J','V','S','D'];
+
+  // Get weeks of current month
+  const refDate = getWeekDates(currentWeek)[0].date;
+  const month = refDate.getMonth();
+  const year = refDate.getFullYear();
+  const months=['Jan','Fév','Mar','Avr','Mai','Jun','Jul','Aoû','Sep','Oct','Nov','Déc'];
+
+  const weeks = [];
+  for(let wk=currentWeek-2;wk<=currentWeek+5;wk++){
+    if(wk<1||wk>53) continue;
+    const wd=getWeekDates(wk);
+    if(wd.some(d=>d.date.getMonth()===month&&d.date.getFullYear()===year)){
+      weeks.push({wk,wd});
+    }
+  }
+
+  const getShift=(empId,di,wk)=>{
+    const sched=getSchedule(storeId,wk,currentYear);
+    let sh=sched[`${empId}_${di}`];
+    // check déplacement
+    if(!sh?.startTime){
+      stores.forEach(st=>{
+        if(st.id===storeId) return;
+        const o=getSchedule(st.id,wk,currentYear);
+        const s=o[`${empId}_${di}`];
+        if(s&&WORK.includes(s.type)) sh={...s,_away:true,_awayStoreName:st.name,_awayColor:st.color};
+      });
+    }
+    return sh;
+  };
+
+  const monthTotal=(empId)=>{
+    let t=0;
+    weeks.forEach(({wk,wd})=>{
+      wd.forEach((_,di)=>{
+        const sh=getShift(empId,di,wk);
+        if(sh&&WORK.includes(sh.type)){
+          if(sh.startTime&&sh.endTime){const d=(()=>{try{const[sh2,sm]=sh.startTime.split(':').map(Number),[eh,em]=sh.endTime.split(':').map(Number);const d=(eh*60+em)-(sh2*60+sm);return Math.max(0,parseFloat(((d-Math.round((sh.breakH||0)*60))/60).toFixed(2)));}catch{return 0;}})(); t+=d; }
+          if(sh.split?.startTime&&sh.split?.endTime){const d=(()=>{try{const[sh2,sm]=sh.split.startTime.split(':').map(Number),[eh,em]=sh.split.endTime.split(':').map(Number);const d=(eh*60+em)-(sh2*60+sm);return Math.max(0,parseFloat(((d-Math.round((sh.split.breakH||0)*60))/60).toFixed(2)));}catch{return 0;}})(); t+=d; }
+        }
+      });
+    });
+    return parseFloat(t.toFixed(2));
+  };
+
+  function fH(d){if(!d||isNaN(d))return'0h';const t=Math.round(d*60),h=Math.floor(t/60),m=t%60;return m===0?`${h}h`:`${h}h${String(m).padStart(2,'0')}`;}
+
+  return(
+    <div style={{overflowX:'auto'}}>
+      <div style={{fontFamily:'var(--font-h)',fontWeight:700,fontSize:18,marginBottom:14,textTransform:'capitalize',color:'var(--text)'}}>
+        {months[month]} {year}
+      </div>
+      {emps.map(emp=>{
+        const mt=monthTotal(emp.id);
+        const isVisitor=emp.storeId!==storeId;
+        const homeStore=isVisitor?stores.find(s=>s.id===emp.storeId):null;
+        return(
+          <div key={emp.id} style={{background:'#fff',borderRadius:14,border:'1.5px solid var(--border)',marginBottom:12,overflow:'hidden',boxShadow:'var(--shadow)'}}>
+            <div style={{display:'flex',alignItems:'center',gap:12,padding:'11px 18px',borderBottom:'1px solid #F0F5F7',background:'var(--card2)'}}>
+              <div style={{width:36,height:36,borderRadius:'50%',background:emp.color||'var(--teal)',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:800,color:'#fff',fontSize:16,flexShrink:0}}>{emp.name[0]}</div>
+              <div style={{flex:1}}>
+                <div style={{fontWeight:700,fontSize:15,display:'flex',alignItems:'center',gap:6}}>
+                  {emp.name}
+                  {isVisitor&&homeStore&&<span style={{fontSize:9,fontWeight:700,color:homeStore.color,background:`${homeStore.color}1A`,border:`1px solid ${homeStore.color}55`,borderRadius:5,padding:'1px 5px'}}>✈ {homeStore.name}</span>}
+                </div>
+                <div style={{fontSize:12,color:'var(--muted)',textTransform:'capitalize'}}>{emp.role} · {emp.contractHours}h/sem</div>
+              </div>
+              <div style={{textAlign:'right'}}>
+                <div style={{fontWeight:800,fontSize:16,color:'var(--teal-dark)',fontVariantNumeric:'tabular-nums'}}>{fH(mt)}</div>
+                <div style={{fontSize:11,color:'var(--dim)'}}>ce mois</div>
+              </div>
+              <button onClick={()=>onOvertimeClick(emp.id)} title="Heures supp" style={{background:'none',border:'1px solid var(--border)',borderRadius:8,padding:'4px 8px',cursor:'pointer',fontSize:12,color:'var(--muted)'}}>⚡</button>
+            </div>
+            {/* Weeks */}
+            {weeks.map(({wk,wd})=>(
+              <div key={wk} style={{display:'grid',gridTemplateColumns:'52px repeat(7,1fr) 60px',borderBottom:'1px solid #F0F5F7'}}>
+                <div style={{padding:'6px 8px',background:'#F8FAFB',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',borderRight:'1px solid #F0F5F7'}}>
+                  <div style={{fontWeight:700,fontSize:12,color:'var(--muted)'}}>S{wk}</div>
+                </div>
+                {wd.map((day,di)=>{
+                  const sh=getShift(emp.id,di,wk);
+                  const st=sh?getMeta(sh.type):{};
+                  const isSun=day.date.getDay()===0;
+                  return(
+                    <div key={di} onClick={()=>sh?.startTime&&onCell(emp.id,di)} style={{padding:'3px 2px',background:isSun?'#FFF8F8':'',cursor:sh?.startTime?'pointer':'default'}}>
+                      <div style={{fontSize:9,fontWeight:600,color:isSun?'#C8002B':'var(--dim)',textAlign:'center',marginBottom:1}}>{DAY_S[di]} {day.date.getDate()}</div>
+                      <div style={{
+                        borderRadius:6,padding:'4px 3px',minHeight:36,
+                        background:sh?sh._away?`${sh._awayColor||st.color}12`:st.bgColor:'#F8FAFB',
+                        border:`1px solid ${sh?sh._away?sh._awayColor||st.color:st.color+'35':'#E8EDF0'}`,
+                        display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:0,
+                      }}>
+                        {sh?(
+                          <>
+                            <span style={{fontSize:9,fontWeight:700,color:sh._away?sh._awayColor||st.color:st.color,textAlign:'center',lineHeight:1.2}}>{sh._away?'✈':st.label?.slice(0,4)}</span>
+                            {sh.startTime&&<span style={{fontSize:8,color:sh._away?sh._awayColor||st.color:st.color,opacity:.85}}>{sh.startTime}</span>}
+                          </>
+                        ):<span style={{color:'#DDE3E8',fontSize:10}}>—</span>}
+                      </div>
+                    </div>
+                  );
+                })}
+                <div style={{padding:'6px 4px',background:'#F8FAFB',borderLeft:'1px solid #F0F5F7',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                  {(()=>{
+                    let wt=0;
+                    wd.forEach((_,di)=>{const sh=getShift(emp.id,di,wk);if(sh&&WORK.includes(sh.type)){if(sh.startTime&&sh.endTime){try{const[sh2,sm]=sh.startTime.split(':').map(Number),[eh,em]=sh.endTime.split(':').map(Number);const d=(eh*60+em)-(sh2*60+sm);wt+=Math.max(0,(d-Math.round((sh.breakH||0)*60))/60);}catch{}}if(sh.split?.startTime&&sh.split?.endTime){try{const[sh2,sm]=sh.split.startTime.split(':').map(Number),[eh,em]=sh.split.endTime.split(':').map(Number);const d=(eh*60+em)-(sh2*60+sm);wt+=Math.max(0,(d-Math.round((sh.split.breakH||0)*60))/60);}catch{}}}});
+                    return <span style={{fontSize:11,fontWeight:700,color:'var(--teal-dark)',fontVariantNumeric:'tabular-nums'}}>{fH(parseFloat(wt.toFixed(2)))}</span>;
+                  })()}
+                </div>
+              </div>
+            ))}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ── WEEK VIEW ────────────────────────────────────────────── */
+function WeekView({emps,days,allDays,sched,types,onCell,totalH,onDragStart,onDragOver,onDrop,onDragEnd,dragOver,extraEmpIds,overtimeRecords,onOvertimeClick,clipboard,onCopyShift,onPasteShift,allStores,activeStoreId,getContractH}){
+  return(
+    <div className="card" style={{overflow:'hidden'}}>
+      <div style={{overflowX:'auto'}}>
+        <table style={{width:'100%',borderCollapse:'collapse',minWidth:800}}>
+          <thead>
+            <tr style={{background:'var(--card2)',borderBottom:'2px solid var(--border)'}}>
+              <th style={{padding:'18px 24px',textAlign:'left',fontSize:14,color:'var(--muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:'.05em',width:240}}>Employé</th>
+              {days.map((wd,i)=>(
+                <th key={i} style={{padding:'13px 8px',textAlign:'center',minWidth:100}}>
+                  <div style={{fontWeight:800,fontSize:16,color:wd.date.getDay()===0?'#C8002B':'var(--text)'}}>{wd.day.slice(0,3)}</div>
+                  <div style={{fontSize:13,color:'var(--dim)',marginTop:3}}>{wd.date.toLocaleDateString('fr-FR',{day:'numeric',month:'short'})}</div>
+                </th>
+              ))}
+              <th style={{padding:'13px 16px',textAlign:'center',fontSize:13,color:'var(--muted)',fontWeight:700,width:90}}>Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {emps.map((emp,ei)=>{
+              const t=totalH(emp.id),c=(getContractH?getContractH(emp):(emp.contractHours||35)),diff=t-c;
+              const isBorrowed=extraEmpIds.includes(emp.id);
+              return(
+                <tr key={emp.id} style={{borderBottom:'1px solid var(--border)',background:isBorrowed?'#FFFDE7':ei%2===0?'#fff':'var(--card2)'}}>
+                  <td style={{padding:'10px 20px'}}>
+                    <div style={{display:'flex',alignItems:'center',gap:10}}>
+                      <div style={{width:46,height:46,borderRadius:'50%',background:emp.color||'var(--teal)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:19,fontWeight:800,color:'#fff',flexShrink:0}}>
+                        {emp.name[0]}
+                      </div>
+                      <div>
+                        <div style={{fontWeight:700,fontSize:14,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
+                          {emp.name}
+                          {isBorrowed&&(()=>{
+                            const homeStore=allStores?.find(s=>s.id===emp.storeId);
+                            const isAssignedManager=['manager','dirigeant','admin'].includes(emp.role)&&(emp.managedStores||[]).includes(activeStoreId);
+                            if(isAssignedManager){
+                              return <span style={{fontSize:10,background:'#6366F11A',color:'#6366F1',border:'1px solid #6366F155',borderRadius:6,padding:'2px 7px',fontWeight:700,whiteSpace:'nowrap'}}>👔 Responsable</span>;
+                            }
+                            return <span style={{fontSize:10,background:`${homeStore?.color||'#B07D00'}1A`,color:homeStore?.color||'#B07D00',border:`1px solid ${homeStore?.color||'#B07D00'}55`,borderRadius:6,padding:'2px 7px',fontWeight:700,whiteSpace:'nowrap'}}>
+                              ✈ vient de {homeStore?.name||'autre magasin'}
+                            </span>;
+                          })()}
+                        </div>
+                        <div style={{fontSize:13,color:'var(--muted)',marginTop:3,textTransform:'capitalize'}}>{emp.role} · {c}h</div>
+                      </div>
+                    </div>
+                  </td>
+                  {days.map((wd,di)=>{
+                    const ri=allDays.indexOf(wd);
+                    const sh=sched[`${emp.id}_${ri}`];
+                    const st=sh?getMeta(types,sh.type):null;
+                    const isDragOver=dragOver?.empId===emp.id&&dragOver?.dayIdx===ri;
+                    return(
+                      <td key={di} style={{padding:'5px 5px'}}
+                        onDragOver={e=>onDragOver(emp.id,ri,e)}
+                        onDrop={e=>onDrop(emp.id,ri,e)}
+                      >
+                        {sh?(
+                          <div
+                            draggable={!sh._away}
+                            onDragStart={e=>!sh._away&&onDragStart(emp.id,ri,e)}
+                            onDragEnd={onDragEnd}
+                            onClick={()=>onCell(emp.id,ri)}
+                            style={{
+                              background:isDragOver?'var(--teal-light)':(sh._away?`${sh._awayColor||st.color}14`:st.bgColor),
+                              border:sh._away?`2px dashed ${sh._awayColor||st.color}`:`1.5px solid ${isDragOver?'var(--teal)':st.color+'50'}`,
+                              borderRadius:12,padding:'12px 8px',minHeight:82,
+                              cursor:'pointer',transition:'all .12s',
+                              display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:2,
+                              userSelect:'none',position:'relative',
+                            }}
+                            onMouseEnter={e=>{e.currentTarget.style.transform='scale(1.03)';e.currentTarget.style.boxShadow=`0 4px 16px ${st.color}40`;e.currentTarget.style.zIndex='2';}}
+                            onMouseLeave={e=>{e.currentTarget.style.transform='scale(1)';e.currentTarget.style.boxShadow='none';e.currentTarget.style.zIndex='1';}}
+                          >
+                            {/* Copy button (top-right) */}
+                            {!sh._away&&onCopyShift&&(
+                              <button onClick={e=>{e.stopPropagation();onCopyShift(sh);}}
+                                title="Copier cet horaire"
+                                style={{position:'absolute',top:3,right:3,width:20,height:20,borderRadius:5,border:'none',background:'rgba(255,255,255,.7)',cursor:'pointer',fontSize:10,lineHeight:1,padding:0,opacity:.6,transition:'opacity .15s'}}
+                                onMouseEnter={e=>e.currentTarget.style.opacity='1'}
+                                onMouseLeave={e=>e.currentTarget.style.opacity='.6'}
+                              >📋</button>
+                            )}
+                            {sh._away&&(sh._awayStoreName||(allStores||[]).find(s=>s.id===sh._awayStoreId))&&(
+                              <span style={{position:'absolute',top:2,left:4,fontSize:8,fontWeight:800,color:sh._awayColor||st.color,background:'rgba(255,255,255,.85)',borderRadius:4,padding:'1px 4px'}}>
+                                ✈ {(sh._awayStoreName||(allStores||[]).find(s=>s.id===sh._awayStoreId)?.name||'').slice(0,10)}
+                              </span>
+                            )}
+                            <span style={{fontSize:14,fontWeight:700,color:isDragOver?'var(--teal-dark)':st.color,marginTop:sh._away?8:0}}>{sh._away?'Déplacement':st.label}</span>
+                            {sh.startTime&&<span style={{fontSize:14,color:st.color,opacity:.9,fontWeight:700}}>{sh.startTime}–{sh.endTime}</span>}
+                            {mainHours(sh)>0&&<span style={{fontSize:13,color:st.color,opacity:.8,fontWeight:700}}>{fmtH(mainHours(sh))}</span>}
+                            {sh.split&&(()=>{const st2=getMeta(types,sh.split.type);return(<>
+                              <div style={{width:'80%',height:1,background:st.color,opacity:.3,margin:'2px 0'}}/>
+                              <span style={{fontSize:13,fontWeight:700,color:st2.color}}>{st2.label}</span>
+                              {sh.split.startTime&&<span style={{fontSize:12,color:st2.color,opacity:.85}}>{sh.split.startTime}–{sh.split.endTime}</span>}
+                              {splitHours(sh)>0&&<span style={{fontSize:12,color:st2.color,opacity:.75}}>{fmtH(splitHours(sh))}</span>}
+                            </>);})()}
+                          </div>
+                        ):(
+                          <div
+                            onDragOver={e=>onDragOver(emp.id,ri,e)}
+                            onDrop={e=>onDrop(emp.id,ri,e)}
+                            onClick={()=>onCell(emp.id,ri)}
+                            style={{
+                              minHeight:68,borderRadius:12,position:'relative',
+                              border:`2px dashed ${isDragOver?'var(--teal)':'var(--border)'}`,
+                              background:isDragOver?'var(--teal-light)':'transparent',
+                              display:'flex',alignItems:'center',justifyContent:'center',
+                              cursor:'pointer',transition:'all .12s',
+                              color:isDragOver?'var(--teal-dark)':'var(--dim)',fontSize:22,
+                            }}
+                            onMouseEnter={e=>{if(!isDragOver){e.currentTarget.style.background='var(--teal-light)';e.currentTarget.style.borderColor='var(--teal)';e.currentTarget.style.color='var(--teal-dark)';}}}
+                            onMouseLeave={e=>{if(!isDragOver){e.currentTarget.style.background='transparent';e.currentTarget.style.borderColor='var(--border)';e.currentTarget.style.color='var(--dim)';}}}
+                          >
+                            +
+                            {clipboard&&onPasteShift&&(
+                              <button onClick={e=>{e.stopPropagation();onPasteShift(emp.id,ri);}}
+                                title="Coller l'horaire copié"
+                                style={{position:'absolute',bottom:3,right:3,width:22,height:22,borderRadius:6,border:'none',background:'var(--teal)',color:'#fff',cursor:'pointer',fontSize:11,lineHeight:1,padding:0,boxShadow:'0 2px 6px rgba(0,201,177,.4)'}}
+                              >📌</button>
+                            )}
+                          </div>
+                        )}
+                      </td>
+                    );
+                  })}
+                  <OvertimeTotalCell t={t} diff={diff} emp={emp} overtimeRecords={overtimeRecords} onOvertimeClick={onOvertimeClick}/>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+/* ── DAY VIEW ─────────────────────────────────────────────── */
+function DayView({emps,day,dayIdx,sched,types,onCell,onDragStart,onDragOver,onDrop,onDragEnd,dragOver}){
+  return(
+    <div>
+      <div style={{background:'var(--teal-light)',border:'2px solid var(--teal-mid)',borderRadius:13,padding:'14px 20px',marginBottom:14}}>
+        <h3 style={{fontFamily:'var(--font-h)',fontWeight:700,fontSize:19,color:'var(--teal-dark)',textTransform:'capitalize'}}>
+          {day.day} — {day.date.toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}
+        </h3>
+      </div>
+      <div style={{display:'grid',gap:9}}>
+        {emps.map(emp=>{
+          const sh=sched[`${emp.id}_${dayIdx}`];
+          const st=sh?getMeta(types,sh.type):null;
+          const isDragOver=dragOver?.empId===emp.id&&dragOver?.dayIdx===dayIdx;
+          return(
+            <div key={emp.id}
+              draggable={!!sh}
+              onDragStart={e=>sh&&onDragStart(emp.id,dayIdx,e)}
+              onDragEnd={onDragEnd}
+              onDragOver={e=>onDragOver(emp.id,dayIdx,e)}
+              onDrop={e=>onDrop(emp.id,dayIdx,e)}
+              onClick={()=>onCell(emp.id,dayIdx)}
+              className="card"
+              style={{
+                display:'flex',alignItems:'center',gap:16,padding:'15px 22px',
+                cursor:'pointer',transition:'all .15s',
+                background:isDragOver?'var(--teal-light)':sh?st.bgColor:'#fff',
+                borderLeft:isDragOver?'5px solid var(--teal)':sh?`5px solid ${st.color}`:'5px solid var(--border)',
+              }}
+              onMouseEnter={e=>{if(sh){e.currentTarget.style.transform='translateX(4px)';e.currentTarget.style.boxShadow=`0 4px 20px ${st.color}35`;}}}
+              onMouseLeave={e=>{e.currentTarget.style.transform='translateX(0)';e.currentTarget.style.boxShadow='none';}}
+            >
+              <div style={{width:42,height:42,borderRadius:'50%',background:emp.color||'var(--teal)',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:800,color:'#fff',fontSize:17,flexShrink:0}}>{emp.name[0]}</div>
+              <div style={{flex:1}}>
+                <div style={{fontWeight:700,fontSize:15}}>{emp.name}</div>
+                <div style={{color:'var(--dim)',fontSize:13}}>{emp.role} · {emp.contractHours}h/sem</div>
+              </div>
+              {sh?(
+                <div style={{textAlign:'right'}}>
+                  <div style={{fontWeight:700,color:st.color,fontSize:15}}>{st.label}</div>
+                  {sh.startTime&&<div style={{color:'var(--muted)',fontSize:13}}>{sh.startTime}–{sh.endTime} · {sh.hours}h</div>}
+                  {sh.note&&<div style={{fontSize:11,color:'var(--dim)',fontStyle:'italic'}}>{sh.note}</div>}
+                </div>
+              ):<span style={{color:'var(--dim)',fontSize:24}}>+</span>}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
